@@ -21,9 +21,17 @@ if [ ! -f "$ENV_FILE" ]; then
     exit 1
 fi
 
-# Source .env file
+# Source .env file with better error handling
 set -a
-source "$ENV_FILE"
+if ! source "$ENV_FILE" 2>&1; then
+    echo "❌ Error reading .env file at $ENV_FILE"
+    echo "   Please check for syntax errors (unquoted values with spaces, etc.)"
+    echo ""
+    echo "Common issues:"
+    echo "  - Values with spaces must be quoted: VAR=\"value with spaces\""
+    echo "  - No spaces around the = sign: VAR=value (not VAR = value)"
+    exit 1
+fi
 set +a
 
 # Check required variables

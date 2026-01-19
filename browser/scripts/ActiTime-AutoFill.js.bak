@@ -3,7 +3,7 @@
 // @namespace    http://tampermonkey.net/
 // @version      2.0.0
 // @description  Enhanced ActiTIME autofill with progress indicators, export, undo/redo, and more keyboard shortcuts.
-// @author       Mostafa H.
+// @author       Moutafa H.
 // @match        https://online.actitime.com/*
 // @run-at       document-idle
 // @grant        GM_addStyle
