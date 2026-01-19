@@ -1,53 +1,113 @@
-# Bash Aliases Setup
+# Bash Aliases & Shell Configuration
 
-This directory contains modular bash alias files ready to be used in `~/.bashrc.d/`.
+Modular, category-organized bash aliases for Git, Docker, navigation, and more. Designed for instant application with multiple installation methods.
 
-## Quick Setup
+## 🚀 Quick Start
 
-To use these aliases, copy them to your `~/.bashrc.d/` directory:
-
-```bash
-# Create the directory if it doesn't exist
-mkdir -p ~/.bashrc.d
-
-# Copy all alias files
-cp Aliases/*.sh ~/.bashrc.d/
-
-# Make sure they're executable
-chmod +x ~/.bashrc.d/*.sh
-```
-
-Then ensure your `~/.bashrc` sources files from `~/.bashrc.d/`:
+### Instant Installation (Recommended)
 
 ```bash
-# Add this to your ~/.bashrc if not already present
-if [ -d ~/.bashrc.d ]; then
-  for file in ~/.bashrc.d/*.sh; do
-    [ -r "$file" ] && source "$file"
-  done
-  unset file
-fi
+cd shell/aliases
+./setup.sh
 ```
 
-## File Organization
+This will:
+- Copy aliases to `~/.bashrc.d/`
+- Configure `~/.bashrc` to source them
+- Make everything ready to use
 
-Files are numbered to control load order:
-- `00-core.sh` - Core bash behavior and history settings
-- `10-navigation.sh` - Navigation aliases (cd, .., etc.)
-- `20-colors.sh` - Colors and dircolors configuration
-- `30-ls.sh` - ls command aliases
-- `40-tools.sh` - General tool aliases (clear, bat, vpn, etc.)
-- `50-git.sh` - **Git aliases and helpers**
-- `60-docker.sh` - **Docker aliases and helpers**
-- `70-prompt.sh` - Shell prompt configuration
-- `80-fzf.sh` - Fuzzy finder configuration and helpers
-- `90-nvm.sh` - Node Version Manager
-- `95-atuin.sh` - Atuin shell history
-- `99-path.sh` - PATH modifications
+### Alternative Installation Methods
 
-## Git Aliases
+```bash
+# Method 1: Copy (default, recommended for most users)
+./setup.sh copy
 
-### Basic Shortcuts
+# Method 2: Symlink (updates reflect automatically)
+./setup.sh symlink
+
+# Method 3: Direct sourcing (instant updates, no copying)
+./setup.sh direct
+```
+
+### Instant Application
+
+After installation, either:
+1. **Restart your terminal**, or
+2. **Run**: `source ~/.bashrc`
+
+For direct sourcing method, you can also:
+```bash
+source shell/aliases/loader.sh
+```
+
+## 📁 Structure
+
+Aliases are organized by category for easy navigation and maintenance:
+
+```
+shell/aliases/
+├── core/           # Core bash settings (history, colors, ls, path)
+├── navigation/     # Navigation aliases (cd, .., etc.)
+├── tools/          # General tool aliases (clear, bat, etc.)
+├── git/            # Git aliases and helpers
+├── docker/         # Docker aliases and helpers
+├── prompt/         # Shell prompt configuration
+├── optional/       # Optional tools (fzf, nvm, atuin)
+├── loader.sh       # Direct sourcing loader
+└── setup.sh        # Installation script
+```
+
+## 📋 Installation Methods
+
+### 1. Copy Method (Default)
+- **Best for**: Most users, stable setup
+- **How it works**: Copies files to `~/.bashrc.d/`
+- **Updates**: Re-run setup script to update
+- **Pros**: Independent of repository location
+- **Cons**: Requires re-running setup for updates
+
+### 2. Symlink Method
+- **Best for**: Users who want automatic updates
+- **How it works**: Creates symlinks to repository files
+- **Updates**: Automatic when repository is updated
+- **Pros**: Updates reflect automatically
+- **Cons**: Repository must remain in same location
+
+### 3. Direct Sourcing Method
+- **Best for**: Developers, instant updates
+- **How it works**: Sources directly from repository via `loader.sh`
+- **Updates**: Instant, no setup needed
+- **Pros**: Instant updates, no copying
+- **Cons**: Repository must be accessible
+
+## 🗂️ Category Details
+
+### `core/` - Core Bash Settings
+Essential bash configuration:
+- `core.sh` - History settings, shell options
+- `colors.sh` - Color configuration
+- `ls.sh` - Enhanced ls aliases
+- `path.sh` - PATH modifications
+
+### `navigation/` - Navigation
+Quick navigation aliases:
+- `..` - Go up one directory
+- `...` - Go up two directories
+- `....` - Go up three directories
+- `.....` - Go up four directories
+
+### `tools/` - General Tools
+Common tool shortcuts:
+- `c`, `cls` - Clear screen
+- `mkdirp` - mkdir -p
+- `rmf` - rm -rf
+- `bat` - batcat alias
+- `alert` - Notification for long commands
+
+### `git/` - Git Aliases
+Comprehensive Git shortcuts and helpers.
+
+**Basic Shortcuts:**
 - `g` - git
 - `ga` - git add
 - `gaa` - git add --all
@@ -60,7 +120,7 @@ Files are numbered to control load order:
 - `gs` - git status
 - `gl` - git log
 
-### Useful Functions
+**Useful Functions:**
 - `gcbp <branch>` - Create branch and push upstream
 - `gcam <message>` - Commit all changes with message
 - `gcamp <message>` - Commit all and push
@@ -68,22 +128,23 @@ Files are numbered to control load order:
 - `gwhat <file>` - Show what changed in a file
 - `ghist <file>` - Show file history
 
-### Advanced
+**Advanced:**
 - `gla` - Pretty graph log
 - `gpf` - Push with force-with-lease (safer than force)
 - `gri` - Interactive rebase
 - `guncommit` - Undo last commit (keep changes)
 
-## Docker Aliases
+### `docker/` - Docker Aliases
+Docker and Docker Compose shortcuts.
 
-### Basic Shortcuts
+**Basic Shortcuts:**
 - `d` - docker
 - `dc` - docker compose
 - `dps` - docker ps
 - `di` - docker images
 - `dex` - docker exec -it
 
-### Docker Compose
+**Docker Compose:**
 - `dcu` - docker compose up
 - `dcud` - docker compose up -d
 - `dcd` - docker compose down
@@ -91,24 +152,133 @@ Files are numbered to control load order:
 - `dcp` - docker compose ps
 - `dcb` - docker compose build
 
-### Useful Functions
+**Useful Functions:**
 - `dbash <container>` - Enter container with bash
 - `dsh <container>` - Enter container with sh
 - `dcex <service>` - Exec into compose service
 - `dcrun <service> <cmd>` - Run one-off command
 - `dclean` - Clean up all Docker resources
 - `dip <container>` - Show container IP
-- `dcpfrom <container> <path>` - Copy from container
-- `dcpto <path> <container> <path>` - Copy to container
 
-### System Management
-- `dsysdf` - Show Docker disk usage
-- `dsysprune` - Clean up unused resources
-- `dvolprune` - Remove unused volumes
+### `prompt/` - Prompt Configuration
+Customizable shell prompt with color support.
 
-## Tips
+### `optional/` - Optional Tools
+Tools that may not be installed on all systems:
+- `fzf.sh` - Fuzzy finder configuration
+- `nvm.sh` - Node Version Manager
+- `atuin.sh` - Atuin shell history
 
-1. **Customize as needed**: Feel free to modify these aliases to match your workflow
-2. **Add your own**: Create new numbered files (e.g., `45-custom.sh`) for your personal aliases
-3. **Test before use**: Review the aliases to ensure they don't conflict with your existing setup
-4. **Backup first**: Always backup your existing `~/.bashrc` and `~/.bashrc.d/` before copying
+These are safe to use even if the tools aren't installed.
+
+## 🔧 Customization
+
+### Adding Your Own Aliases
+
+1. **Create a custom file:**
+   ```bash
+   # Add to any category directory, or create a new one
+   echo "# My custom aliases" > shell/aliases/custom/my-aliases.sh
+   ```
+
+2. **Or edit existing files:**
+   ```bash
+   # Edit any .sh file in the category directories
+   nano shell/aliases/tools/tools.sh
+   ```
+
+3. **Re-run setup** (if using copy method) or **reload** (if using direct/symlink):
+   ```bash
+   # For copy method
+   ./setup.sh
+   
+   # For direct/symlink method
+   source ~/.bashrc
+   ```
+
+### Selective Loading
+
+To load only specific categories, you can manually source:
+
+```bash
+# Load only git aliases
+source shell/aliases/git/git.sh
+
+# Load only docker aliases
+source shell/aliases/docker/docker.sh
+```
+
+## 📖 Quick Reference
+
+See [QUICK_REFERENCE.md](./QUICK_REFERENCE.md) for a complete list of all aliases.
+
+## 🛠️ Troubleshooting
+
+### Aliases not working?
+
+1. **Check if ~/.bashrc sources ~/.bashrc.d/:**
+   ```bash
+   grep "bashrc.d" ~/.bashrc
+   ```
+
+2. **Reload your shell:**
+   ```bash
+   source ~/.bashrc
+   ```
+
+3. **Check file permissions:**
+   ```bash
+   ls -la ~/.bashrc.d/
+   ```
+
+4. **Verify installation:**
+   ```bash
+   cd shell/aliases
+   ./setup.sh
+   ```
+
+### Conflicts with existing aliases?
+
+1. **Check what's already defined:**
+   ```bash
+   alias | grep <alias-name>
+   ```
+
+2. **Edit the conflicting file** in the appropriate category directory
+3. **Re-run setup** or **reload**
+
+## 💡 Tips
+
+1. **Start with defaults**: The default setup works great for most users
+2. **Use direct sourcing for development**: If you're actively editing aliases, use `./setup.sh direct`
+3. **Customize gradually**: Add your own aliases as you discover needs
+4. **Version control your customizations**: Keep your custom aliases in version control
+5. **Test before committing**: Test new aliases before sharing
+
+## 🔄 Updating
+
+### Copy Method
+```bash
+cd shell/aliases
+git pull  # Update repository
+./setup.sh  # Re-install
+```
+
+### Symlink/Direct Method
+```bash
+cd shell/aliases
+git pull  # Updates are instant!
+source ~/.bashrc  # Or restart terminal
+```
+
+## 📝 Best Practices
+
+- **Keep it modular**: Each category in its own directory
+- **Use descriptive names**: File names should indicate purpose
+- **Document custom aliases**: Add comments for complex aliases
+- **Test changes**: Verify aliases work before committing
+- **Version control**: Track all changes in git
+
+---
+
+> **Remember**: Productivity aliases should reduce friction. If an alias doesn't help, remove or modify it!
