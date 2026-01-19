@@ -150,6 +150,45 @@ Complete reference of all available aliases and functions.
 | `dip` | `dip <container>` | Show container IP |
 | `dcpfrom` | `dcpfrom <container> <path>` | Copy from container |
 | `dcpto` | `dcpto <path> <container> <path>` | Copy to container |
+| `drmf` | `drmf [container]` | Stop and remove container (interactive with fzf if no arg) |
+
+### FZF-based Functions (Interactive Selection)
+
+**Requires fzf installed. Uses bat for logs and jq for JSON when available.**
+
+| Function | Usage | Description |
+|---------|-------|-------------|
+| `dlogsf` | `dlogsf` | Select container and view logs (with bat) |
+| `dexecf` | `dexecf` | Select container and exec into it |
+| `dstopf` | `dstopf` | Select container and stop it |
+| `dstartf` | `dstartf` | Select container and start it |
+| `dinspectf` | `dinspectf` | Select container and inspect (with jq) |
+| `dstatsf` | `dstatsf` | Select container and show stats |
+| `dcpfromf` | `dcpfromf` | Select container and copy file from |
+| `dcptof` | `dcptof` | Select container and copy file to |
+| `diinspectf` | `diinspectf` | Select image and inspect (with jq) |
+| `drmif` | `drmif` | Select image and delete it |
+| `dclogf` | `dclogf` | Select compose service and view logs (with bat) |
+| `dcexf` | `dcexf` | Select compose service and exec into it |
+
+## FZF File Browsing (Interactive)
+
+**Requires fzf. Uses bat for previews and jq for JSON when available.**
+
+| Function | Usage | Description |
+|---------|-------|-------------|
+| `fls` | `fls` | Browse files with `ls` output and preview (with bat) |
+| `fcat` | `fcat` | Browse files and preview content (with bat) |
+| `fvim` | `fvim` | Browse files and edit with $EDITOR (with bat preview) |
+| `fbat` | `fbat` | Browse files and view full content with bat |
+| `fgrep` | `fgrep [pattern]` | Search files by pattern and preview matches |
+| `fjq` | `fjq` | Browse JSON files and preview formatted (requires jq) |
+| `frecent` | `frecent` | Browse recently modified files (last 7 days) |
+| `frm` | `frm` | Browse and delete files (with confirmation) |
+| `fcd` / `cdf` | `fcd` | Browse directories and cd into selected |
+| `fe` | `fe` | Browse files and edit (enhanced with bat preview) |
+| `fh` | `fh` | Browse command history |
+| `fkill` | `fkill` | Browse processes and kill selected |
 
 ## Tips
 
@@ -157,6 +196,7 @@ Complete reference of all available aliases and functions.
 - Use `type <alias>` to see what an alias does
 - Check individual `.sh` files for complete documentation
 - Customize aliases to match your workflow
+- FZF aliases gracefully fall back if fzf/bat/jq are not installed
 
 ---
 

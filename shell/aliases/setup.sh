@@ -8,210 +8,233 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_DIR="$HOME/.bashrc.d"
 BASHRC_FILE="$HOME/.bashrc"
 
-# Colors for output
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Installation methods
-METHOD_COPY="copy"
-METHOD_SYMLINK="symlink"
-METHOD_DIRECT="direct"
+# Installation method
+INSTALL_METHOD="${1:-copy}"
 
-# Default method
-INSTALL_METHOD="${1:-$METHOD_COPY}"
+# Load order definition (shared across all methods)
+LOAD_ORDER=(
+    "00:core:core.sh"
+    "10:navigation:navigation.sh"
+    "20:core:colors.sh"
+    "30:core:ls.sh"
+    "40:tools:tools.sh"
+    "50:git:git.sh"
+    "60:docker:docker.sh"
+    "70:prompt:prompt.sh"
+    "80:optional:fzf.sh"
+    "90:optional:nvm.sh"
+    "95:optional:atuin.sh"
+    "99:core:path.sh"
+)
+
+# Old files from previous structure
+OLD_FILES=(
+    "00-core.sh" "10-navigation.sh" "20-colors.sh" "30-ls.sh"
+    "40-tools.sh" "50-git.sh" "60-docker.sh" "70-prompt.sh"
+    "80-fzf.sh" "90-nvm.sh" "95-atuin.sh" "99-path.sh"
+)
 
 echo -e "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║${NC}     ${GREEN}Bash Aliases Setup${NC}                              ${BLUE}║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-# Validate installation method
-if [[ ! "$INSTALL_METHOD" =~ ^($METHOD_COPY|$METHOD_SYMLINK|$METHOD_DIRECT)$ ]]; then
-    echo -e "${RED}❌ Invalid installation method: $INSTALL_METHOD${NC}"
-    echo ""
+# Validate method
+if [[ ! "$INSTALL_METHOD" =~ ^(copy|symlink|direct)$ ]]; then
+    echo -e "${RED}❌ Invalid method: $INSTALL_METHOD${NC}"
     echo "Usage: $0 [copy|symlink|direct]"
-    echo ""
-    echo "Methods:"
-    echo "  copy     - Copy files to ~/.bashrc.d/ (default, recommended)"
-    echo "  symlink  - Create symlinks to repository files"
-    echo "  direct   - Source directly from repository (no copying)"
     exit 1
 fi
 
-echo -e "${BLUE}Installation method: ${GREEN}$INSTALL_METHOD${NC}"
-echo -e "${BLUE}Source directory: ${GREEN}$SCRIPT_DIR${NC}"
+echo -e "${BLUE}Method: ${GREEN}$INSTALL_METHOD${NC} | ${BLUE}Source: ${GREEN}$SCRIPT_DIR${NC}"
 echo ""
 
-# Function to ensure bashrc.d sourcing
+# Ensure bashrc.d sourcing
 ensure_bashrc_sourcing() {
-    local source_code="if [ -d ~/.bashrc.d ]; then
+    local source_code='if [ -d ~/.bashrc.d ]; then
   for file in ~/.bashrc.d/*.sh; do
-    [ -r \"\$file\" ] && source \"\$file\"
+    [ -r "$file" ] && source "$file"
   done
   unset file
-fi"
+fi'
 
     if ! grep -q "bashrc.d" "$BASHRC_FILE" 2>/dev/null; then
-        echo -e "${YELLOW}⚠️  Your ~/.bashrc doesn't source ~/.bashrc.d/${NC}"
-        echo ""
-        read -p "Would you like to add it automatically? (y/n) " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}⚠️  ~/.bashrc doesn't source ~/.bashrc.d/${NC}"
+        if [[ -t 0 ]]; then
+            # Only prompt if stdin is a terminal
+            read -p "Add it automatically? (y/n) " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                echo "" >> "$BASHRC_FILE"
+                echo "# Source bashrc.d files" >> "$BASHRC_FILE"
+                echo "$source_code" >> "$BASHRC_FILE"
+                echo -e "${GREEN}✅ Added to ~/.bashrc${NC}"
+            fi
+        else
+            # Non-interactive: auto-add
             echo "" >> "$BASHRC_FILE"
             echo "# Source bashrc.d files" >> "$BASHRC_FILE"
             echo "$source_code" >> "$BASHRC_FILE"
             echo -e "${GREEN}✅ Added to ~/.bashrc${NC}"
-        else
-            echo -e "${YELLOW}⚠️  You'll need to manually add the sourcing code to ~/.bashrc${NC}"
         fi
     else
         echo -e "${GREEN}✅ ~/.bashrc already sources ~/.bashrc.d/${NC}"
     fi
 }
 
-# Function to install via copy
-install_copy() {
-    echo -e "${BLUE}📋 Installing via copy method...${NC}"
-    echo ""
-    
-    mkdir -p "$TARGET_DIR"
-    
-    # Build list of source files
-    SOURCE_FILES=()
-    for dir in core navigation tools git docker prompt optional; do
-        dir_path="$SCRIPT_DIR/$dir"
-        if [[ -d "$dir_path" ]]; then
-            for file in "$dir_path"/*.sh; do
-                if [[ -f "$file" ]]; then
-                    SOURCE_FILES+=("$file")
-                fi
-            done
-        fi
+# Cleanup old files
+cleanup_old_files() {
+    local new_names=()
+    for entry in "${LOAD_ORDER[@]}"; do
+        IFS=':' read -r number category filename <<< "$entry"
+        new_names+=("${number}-${filename}")
     done
-    
-    # Remove old files that are no longer in source
+
     echo -e "${BLUE}Cleaning up old files...${NC}"
-    REMOVED_COUNT=0
-    for old_file in "$TARGET_DIR"/*.sh; do
-        if [[ -f "$old_file" ]]; then
-            old_basename="$(basename "$old_file")"
-            found=false
-            for src_file in "${SOURCE_FILES[@]}"; do
-                if [[ "$(basename "$src_file")" == "$old_basename" ]]; then
-                    found=true
-                    break
-                fi
-            done
-            if [[ "$found" == false ]]; then
-                rm -v "$old_file"
-                ((REMOVED_COUNT++))
-            fi
-        fi
-    done
-    if [[ $REMOVED_COUNT -eq 0 ]]; then
-        echo -e "${GREEN}  No old files to remove${NC}"
+    local removed=0
+    
+    # Handle case where directory doesn't exist or is empty
+    if [[ ! -d "$TARGET_DIR" ]] || [[ -z "$(ls -A "$TARGET_DIR"/*.sh 2>/dev/null)" ]]; then
+        echo -e "${GREEN}  No files to remove${NC}"
+        return 0
     fi
     
-    # Copy files maintaining directory structure
-    echo ""
-    echo -e "${BLUE}Copying alias files...${NC}"
-    for src_file in "${SOURCE_FILES[@]}"; do
-        rel_path="${src_file#$SCRIPT_DIR/}"
-        target_file="$TARGET_DIR/$(basename "$rel_path")"
-        cp -v "$src_file" "$target_file"
-        chmod +x "$target_file"
-    done
-    
-    ensure_bashrc_sourcing
-}
-
-# Function to install via symlink
-install_symlink() {
-    echo -e "${BLUE}🔗 Installing via symlink method...${NC}"
-    echo ""
-    
-    mkdir -p "$TARGET_DIR"
-    
-    # Create symlinks
-    echo -e "${BLUE}Creating symlinks...${NC}"
-    for dir in core navigation tools git docker prompt optional; do
-        dir_path="$SCRIPT_DIR/$dir"
-        if [[ -d "$dir_path" ]]; then
-            for file in "$dir_path"/*.sh; do
-                if [[ -f "$file" ]]; then
-                    target_file="$TARGET_DIR/$(basename "$file")"
-                    # Remove existing file/symlink
-                    [[ -L "$target_file" || -f "$target_file" ]] && rm "$target_file"
-                    ln -sv "$file" "$target_file"
-                fi
+    for old_file in "$TARGET_DIR"/*.sh; do
+        [[ ! -f "$old_file" && ! -L "$old_file" ]] && continue
+        
+        local basename="$(basename "$old_file")"
+        local should_remove=false
+        
+        # Check if old numbered file
+        for old_name in "${OLD_FILES[@]}"; do
+            [[ "$basename" == "$old_name" ]] && should_remove=true && break
+        done
+        
+        # Check if new numbered file (will be replaced)
+        for new_name in "${new_names[@]}"; do
+            [[ "$basename" == "$new_name" ]] && should_remove=true && break
+        done
+        
+        # Check if matches numbered pattern
+        if [[ "$basename" =~ ^[0-9]{2}-.*\.sh$ ]]; then
+            local base="${basename#*-}"
+            for new_name in "${new_names[@]}"; do
+                [[ "$new_name" =~ ^[0-9]{2}-${base}$ ]] && should_remove=true && break
             done
+        fi
+        
+        if [[ "$should_remove" == true ]]; then
+            if rm -v "$old_file" 2>/dev/null; then
+                removed=$((removed + 1))
+            fi
+        else
+            echo -e "${YELLOW}  Keeping: $basename${NC}"
         fi
     done
     
+    [[ $removed -eq 0 ]] && echo -e "${GREEN}  No files to remove${NC}"
+}
+
+# Install via copy
+install_copy() {
+    echo -e "${BLUE}📋 Installing via copy...${NC}"
+    mkdir -p "$TARGET_DIR"
+    cleanup_old_files
+    
+    echo ""
+    echo -e "${BLUE}Copying files...${NC}"
+    local copied=0
+    for entry in "${LOAD_ORDER[@]}"; do
+        IFS=':' read -r number category filename <<< "$entry" || continue
+        src="$SCRIPT_DIR/$category/$filename"
+        if [[ -f "$src" ]]; then
+            target="$TARGET_DIR/${number}-${filename}"
+            if cp "$src" "$target" 2>/dev/null; then
+                chmod +x "$target" 2>/dev/null || true
+                echo "  ✓ ${number}-${filename}"
+                copied=$((copied + 1))
+            else
+                echo -e "${RED}  ✗ Failed: ${number}-${filename}${NC}"
+            fi
+        else
+            echo -e "${YELLOW}  ⚠ Missing: $category/$filename${NC}"
+        fi
+    done
+    echo -e "${GREEN}  Copied $copied/${#LOAD_ORDER[@]} files${NC}"
+    
     ensure_bashrc_sourcing
 }
 
-# Function to install via direct sourcing
+# Install via symlink
+install_symlink() {
+    echo -e "${BLUE}🔗 Installing via symlink...${NC}"
+    mkdir -p "$TARGET_DIR"
+    cleanup_old_files
+    
+    echo ""
+    echo -e "${BLUE}Creating symlinks...${NC}"
+    for entry in "${LOAD_ORDER[@]}"; do
+        IFS=':' read -r number category filename <<< "$entry"
+        src="$SCRIPT_DIR/$category/$filename"
+        [[ -f "$src" ]] || continue
+        target="$TARGET_DIR/${number}-${filename}"
+        ln -sv "$src" "$target"
+    done
+    
+    ensure_bashrc_sourcing
+}
+
+# Install via direct sourcing
 install_direct() {
-    echo -e "${BLUE}⚡ Installing via direct sourcing method...${NC}"
-    echo ""
-    echo -e "${YELLOW}This method sources aliases directly from the repository.${NC}"
-    echo -e "${YELLOW}No files will be copied. Updates are instant!${NC}"
+    echo -e "${BLUE}⚡ Installing via direct sourcing...${NC}"
+    echo -e "${YELLOW}Updates are instant - no copying needed!${NC}"
     echo ""
     
-    local loader_path="$SCRIPT_DIR/loader.sh"
-    local source_line="[ -f \"$loader_path\" ] && source \"$loader_path\""
+    local loader="$SCRIPT_DIR/loader.sh"
+    local source_line="[ -f \"$loader\" ] && source \"$loader\""
     
-    if grep -qF "$loader_path" "$BASHRC_FILE" 2>/dev/null; then
-        echo -e "${GREEN}✅ Direct sourcing already configured in ~/.bashrc${NC}"
+    if grep -qF "$loader" "$BASHRC_FILE" 2>/dev/null; then
+        echo -e "${GREEN}✅ Already configured${NC}"
     else
-        read -p "Add direct sourcing to ~/.bashrc? (y/n) " -n 1 -r
+        read -p "Add to ~/.bashrc? (y/n) " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             echo "" >> "$BASHRC_FILE"
             echo "# Source aliases directly from repository" >> "$BASHRC_FILE"
             echo "$source_line" >> "$BASHRC_FILE"
-            echo -e "${GREEN}✅ Added direct sourcing to ~/.bashrc${NC}"
+            echo -e "${GREEN}✅ Added${NC}"
         else
-            echo -e "${YELLOW}⚠️  You can manually add this to ~/.bashrc:${NC}"
-            echo ""
+            echo -e "${YELLOW}Add manually:${NC}"
             echo "$source_line"
         fi
     fi
 }
 
-# Main installation logic
+# Main
 case "$INSTALL_METHOD" in
-    "$METHOD_COPY")
-        install_copy
-        ;;
-    "$METHOD_SYMLINK")
-        install_symlink
-        ;;
-    "$METHOD_DIRECT")
-        install_direct
-        ;;
+    copy) install_copy ;;
+    symlink) install_symlink ;;
+    direct) install_direct ;;
 esac
 
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║${NC}                    ${GREEN}✅ Setup Complete!${NC}                      ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}                    ${GREEN}✅ Complete!${NC}                      ${GREEN}║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-if [[ "$INSTALL_METHOD" == "$METHOD_DIRECT" ]]; then
-    echo -e "${BLUE}To use the aliases immediately, run:${NC}"
-    echo -e "${GREEN}  source $SCRIPT_DIR/loader.sh${NC}"
-    echo ""
-    echo -e "${BLUE}Or restart your terminal.${NC}"
+if [[ "$INSTALL_METHOD" == "direct" ]]; then
+    echo -e "${BLUE}Run: ${GREEN}source $SCRIPT_DIR/loader.sh${NC} (or restart terminal)"
 else
-    echo -e "${BLUE}To use the aliases, either:${NC}"
-    echo -e "${GREEN}  1. Restart your terminal, or${NC}"
-    echo -e "${GREEN}  2. Run: source ~/.bashrc${NC}"
+    echo -e "${BLUE}Run: ${GREEN}source ~/.bashrc${NC} (or restart terminal)"
 fi
 
 echo ""
-echo -e "${BLUE}See README.md for alias documentation.${NC}"
+echo -e "${BLUE}See README.md for documentation${NC}"
