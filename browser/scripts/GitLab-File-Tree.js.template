@@ -1,0 +1,1053 @@
+// ==UserScript==
+// @name         GitLab File Tree Sidebar
+// @namespace    https://{{GITLAB_URL}}/
+// @version      2.0.0
+// @description  Enhanced GitLab file tree sidebar with keyboard shortcuts, quick search, file counts, copy path, and more. Dark grey themed with icons for various file types.
+// @match        https://{{GITLAB_URL}}/*/-/blob/*
+// @match        https://{{GITLAB_URL}}/*/-/tree/*
+// @match        https://{{GITLAB_URL}}/*/-/edit/*
+// @match        https://{{GITLAB_URL}}/*
+// @exclude      https://{{GITLAB_URL}}/*/-/issues*
+// @exclude      https://{{GITLAB_URL}}/*/-/merge_requests*
+// @exclude      https://{{GITLAB_URL}}/*/-/pipelines*
+// @exclude      https://{{GITLAB_URL}}/*/-/wikis*
+// @exclude      https://{{GITLAB_URL}}/*/-/snippets*
+// @exclude      https://{{GITLAB_URL}}/*/-/settings*
+// @exclude      https://{{GITLAB_URL}}/*/-/activity*
+// @exclude      https://{{GITLAB_URL}}/*/-/graphs*
+// @exclude      https://{{GITLAB_URL}}/*/-/network*
+// @exclude      https://{{GITLAB_URL}}/*/-/compare*
+// @exclude      https://{{GITLAB_URL}}/*/-/commits*
+// @exclude      https://{{GITLAB_URL}}/*/-/tags*
+// @exclude      https://{{GITLAB_URL}}/*/-/releases*
+// @exclude      https://{{GITLAB_URL}}/*/-/milestones*
+// @run-at       document-idle
+// @grant        GM_addStyle
+// @grant        GM_setValue
+// @grant        GM_getValue
+// ==/UserScript==
+
+(function () {
+    'use strict';
+
+    // ---------- Utilities ----------
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    const $ = (sel, root = document) => root.querySelector(sel);
+    const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+    function parseGitLabUrl() {
+        // URL pattern: /<namespace...>/<project>/-/(blob|tree|edit)/<branch>/<optional path...>
+        // OR: /<namespace...>/<project> (project root page - no /-/action)
+        const parts = location.pathname.split('/').filter(Boolean);
+        const dashIdx = parts.indexOf('-');
+
+        let projectPathArr, repoAction, branch, subpath;
+
+        if (dashIdx >= 1 && dashIdx + 1 < parts.length) {
+            // Standard pattern with /-/blob, /-/tree, etc.
+            repoAction = parts[dashIdx + 1]; // blob | tree | edit | issues | merge_requests | ...
+
+            // Only allow blob, tree, or edit actions
+            if (!['blob', 'tree', 'edit'].includes(repoAction)) {
+                return null; // Exclude issues, merge_requests, pipelines, etc.
+            }
+
+            projectPathArr = parts.slice(0, dashIdx);
+            branch = parts[dashIdx + 2] ? decodeURIComponent(parts[dashIdx + 2]) : '';
+            subpath = parts.slice(dashIdx + 3).join('/'); // may be ""
+        } else {
+            // Project root page - no /-/ in URL
+            // Check if this looks like a project page (has at least 2 path segments)
+            if (parts.length < 2) return null; // Not a project page
+
+            // Try to detect if this is a project page (has project-specific elements)
+            const isProjectPage = document.querySelector('.project-home-panel, .project-repo, [data-project-id], .project-overview, .repository-content');
+            if (!isProjectPage) {
+                // Additional check: if URL has query params or hash, might not be project root
+                if (location.search || location.hash) {
+                    // Could be a filtered view or something else, be more cautious
+                    return null;
+                }
+            }
+
+            // Assume it's a project page - extract project path from URL
+            projectPathArr = parts;
+            repoAction = 'tree'; // Default to tree view
+            branch = '';
+            subpath = '';
+        }
+
+        // Handle cases where branch might be missing or empty (fallback to 'master' or try to detect from page)
+        if (!branch) {
+            // Try multiple methods to detect branch from page
+            let detectedBranch = null;
+
+            // Method 1: GitLab's branch selector dropdown
+            const branchSelector = document.querySelector('.js-project-refs-dropdown .dropdown-toggle-text, .branch-selector .dropdown-toggle-text, [data-ref]');
+            if (branchSelector) {
+                detectedBranch = branchSelector.textContent.trim() || branchSelector.getAttribute('data-ref');
+            }
+
+            // Method 2: Check data attributes on various GitLab elements
+            if (!detectedBranch) {
+                const refElement = document.querySelector('[data-ref], [data-branch], [data-reference]');
+                if (refElement) {
+                    detectedBranch = refElement.getAttribute('data-ref') ||
+                        refElement.getAttribute('data-branch') ||
+                        refElement.getAttribute('data-reference');
+                }
+            }
+
+            // Method 3: Try to extract from breadcrumbs or page title
+            if (!detectedBranch) {
+                const breadcrumb = document.querySelector('.breadcrumbs-list a[href*="/-/tree/"], .breadcrumbs-list a[href*="/-/blob/"]');
+                if (breadcrumb) {
+                    const href = breadcrumb.getAttribute('href');
+                    const match = href.match(/\/(?:tree|blob)\/([^\/]+)/);
+                    if (match) detectedBranch = decodeURIComponent(match[1]);
+                }
+            }
+
+            // Method 4: Try to get from default branch indicator or repository info
+            if (!detectedBranch) {
+                const defaultBranchEl = document.querySelector('[data-default-branch], .default-branch, .repository-default-branch');
+                if (defaultBranchEl) {
+                    detectedBranch = defaultBranchEl.getAttribute('data-default-branch') ||
+                        defaultBranchEl.textContent.trim();
+                }
+            }
+
+            branch = detectedBranch || 'master'; // Default fallback
+        }
+
+        return {
+            host: location.origin,
+            projectPath: projectPathArr.join('/'),
+            projectPathEncoded: encodeURIComponent(projectPathArr.join('/')),
+            repoAction,
+            branch,
+            subpath
+        };
+    }
+
+    // Get default branch from API if not provided
+    async function getDefaultBranch({ host, projectPathEncoded }) {
+        try {
+            const url = `${host}/api/v4/projects/${projectPathEncoded}`;
+            const res = await fetch(url, { credentials: 'include' });
+            if (res.ok) {
+                const project = await res.json();
+                return project.default_branch || 'master';
+            }
+        } catch (err) {
+            console.warn('[GitLab File Tree] Could not fetch default branch:', err);
+        }
+        return 'master';
+    }
+
+    // Fetch the full repo tree (handles pagination)
+    async function fetchRepoTree({ host, projectPathEncoded, branch }) {
+        const perPage = 100;
+
+        // Try alternative branch names if the requested branch fails (e.g., master/main confusion)
+        const branchAttempts = [branch];
+        if (branch === 'master') {
+            branchAttempts.push('main');
+        } else if (branch === 'main') {
+            branchAttempts.push('master');
+        }
+
+        let lastError = null;
+        for (const attemptBranch of branchAttempts) {
+            try {
+                let page = 1;
+                let items = [];
+                while (true) {
+                    const url = `${host}/api/v4/projects/${projectPathEncoded}/repository/tree?ref=${encodeURIComponent(attemptBranch)}&recursive=true&per_page=${perPage}&page=${page}`;
+                    const res = await fetch(url, { credentials: 'include' });
+                    if (!res.ok) {
+                        // If 404 and we have alternatives, try next branch
+                        if (res.status === 404 && branchAttempts.length > 1 && attemptBranch !== branch) {
+                            break; // Try next branch
+                        }
+                        throw new Error(`Tree fetch failed: ${res.status}`);
+                    }
+                    const pageItems = await res.json();
+                    items = items.concat(pageItems);
+                    const nextPage = res.headers.get('X-Next-Page');
+                    if (!nextPage) break;
+                    page = parseInt(nextPage, 10) || (page + 1);
+                }
+                // Success - return items
+                return items; // array of {id, name, type, path}
+            } catch (err) {
+                lastError = err;
+                // Continue to next attempt if we have alternatives
+                if (branchAttempts.length === 1) {
+                    throw err; // No alternatives, throw immediately
+                }
+            }
+        }
+
+        // If all attempts failed, throw the last error
+        throw lastError || new Error('Tree fetch failed for all branch attempts');
+    }
+
+    // Build nested tree structure from flat list
+    function buildTree(items) {
+        const root = { name: '', type: 'tree', path: '', children: new Map() };
+        for (const it of items) {
+            const parts = it.path.split('/');
+            let node = root;
+            let acc = '';
+            for (let i = 0; i < parts.length; i++) {
+                const part = parts[i];
+                acc = acc ? `${acc}/${part}` : part;
+                const isLeaf = i === parts.length - 1;
+                const key = part;
+                if (!node.children.has(key)) {
+                    node.children.set(key, {
+                        name: part,
+                        type: isLeaf ? it.type : 'tree',
+                        path: acc,
+                        children: new Map()
+                    });
+                }
+                node = node.children.get(key);
+            }
+        }
+        return root;
+    }
+
+    // Choose file icon based on name
+    function getFileIconForName(name) {
+        const lower = name.toLowerCase();
+
+        // Docker-related
+        if (name === 'Dockerfile' || name.startsWith('Dockerfile.')) {
+            return '🐳';
+        }
+        if (lower.startsWith('docker-compose') && (lower.endsWith('.yml') || lower.endsWith('.yaml'))) {
+            return '🐳';
+        }
+        if (lower === '.dockerignore') {
+            return '🐳';
+        }
+
+        // Git / GitLab CI related
+        if (
+            lower === '.gitignore' ||
+            lower === '.gitmodules' ||
+            lower === '.gitconfig' ||
+            lower === '.gitattributes' ||
+            lower === '.gitkeep' ||
+            lower === '.gitmessage' ||
+            lower === '.gitreview' ||
+            lower === '.gitlab-ci.yml' ||
+            lower === 'gitlab-ci.yml'
+        ) {
+            return '🌿';
+        }
+
+        // Extension-based icons
+        const dotIdx = lower.lastIndexOf('.');
+        const ext = dotIdx >= 0 ? lower.slice(dotIdx + 1) : '';
+
+        // C / C++
+        if (['c', 'cpp', 'cc', 'cxx', 'h', 'hpp', 'hh', 'hxx'].includes(ext)) {
+            return '💻'; // C/C++ code
+        }
+
+        // Python
+        if (['py', 'pyw'].includes(ext)) {
+            return '🐍';
+        }
+
+        // JavaScript
+        if (['js', 'mjs', 'cjs', 'jsx'].includes(ext)) {
+            return '📘';
+        }
+
+        // Markdown
+        if (ext === 'md' || ext === 'markdown') {
+            return '📝';
+        }
+
+        // TypeScript
+        if (['ts', 'tsx'].includes(ext)) {
+            return '📗';
+        }
+
+        // JSON
+        if (ext === 'json') {
+            return '📋';
+        }
+
+        // YAML
+        if (['yml', 'yaml'].includes(ext)) {
+            return '⚙️';
+        }
+
+        // XML
+        if (ext === 'xml') {
+            return '📄';
+        }
+
+        // HTML
+        if (['html', 'htm'].includes(ext)) {
+            return '🌐';
+        }
+
+        // CSS
+        if (ext === 'css') {
+            return '🎨';
+        }
+
+        // Shell scripts
+        if (['sh', 'bash', 'zsh', 'fish'].includes(ext)) {
+            return '💻';
+        }
+
+        // Configuration files
+        if (['conf', 'config', 'ini', 'toml'].includes(ext)) {
+            return '⚙️';
+        }
+
+        // Default file icon
+        return '📄';
+    }
+
+    // Count files recursively in a folder
+    function countFiles(node) {
+        let count = 0;
+        for (const child of node.children.values()) {
+            if (child.type === 'blob') {
+                count++;
+            } else if (child.type === 'tree') {
+                count += countFiles(child);
+            }
+        }
+        return count;
+    }
+
+    // Render tree to DOM
+    function renderTree(rootNode, ctx) {
+        const { host, projectPath, branch, currentPath } = ctx;
+
+        const container = document.createElement('div');
+        container.className = 'gl-filetree';
+
+        const header = document.createElement('div');
+        header.className = 'gl-filetree__header';
+        header.innerHTML = `
+        <input type="search" class="gl-filetree__filter" placeholder="Filter files… (Ctrl+F)">
+        <div class="gl-filetree__controls">
+          <button class="gl-filetree__btn" data-action="quick-search" title="Quick file search (Ctrl+P)">🔍 Quick</button>
+          <button class="gl-filetree__btn" data-action="expand-all" title="Expand all folders">Expand</button>
+          <button class="gl-filetree__btn" data-action="collapse-all" title="Collapse all folders">Collapse</button>
+        </div>
+      `;
+        const filterInput = $('input.gl-filetree__filter', header);
+        const expandAllBtn = $('button[data-action="expand-all"]', header);
+        const collapseAllBtn = $('button[data-action="collapse-all"]', header);
+        const quickSearchBtn = $('button[data-action="quick-search"]', header);
+
+        const listWrap = document.createElement('div');
+        listWrap.className = 'gl-filetree__listwrap';
+
+        const ul = document.createElement('ul');
+        ul.className = 'gl-filetree__ul';
+        listWrap.appendChild(ul);
+
+        container.appendChild(header);
+        container.appendChild(listWrap);
+
+        function makeUrl(type, path) {
+            // Navigate to blob/tree preserving branch
+            if (type === 'tree') {
+                return `${host}/${projectPath}/-/tree/${encodeURIComponent(branch)}/${path}`;
+            }
+            return `${host}/${projectPath}/-/blob/${encodeURIComponent(branch)}/${path}`;
+        }
+
+        function createNodeEl(node, depth = 0) {
+            const li = document.createElement('li');
+            li.className = 'gl-filetree__li';
+            li.dataset.type = node.type;
+            li.dataset.path = node.path;
+            li.style.setProperty('--depth', depth);
+
+            const isDir = node.type === 'tree';
+            const isActive = currentPath && node.path === currentPath;
+
+            const row = document.createElement('div');
+            row.className = `gl-filetree__row ${isDir ? 'is-dir' : 'is-file'} ${isActive ? 'is-active' : ''}`;
+
+            const fileIcon = isDir ? '📁' : getFileIconForName(node.name);
+            const fileCount = isDir && node.children.size > 0 ? countFiles(node) : 0;
+            const fileCountText = fileCount > 0 ? ` <span class="gl-filetree__count">(${fileCount})</span>` : '';
+
+            row.innerHTML = `
+          <span class="gl-filetree__twisty" ${isDir ? '' : 'style="visibility:hidden"'}>▸</span>
+          <span class="gl-filetree__icon">${fileIcon}</span>
+          <a class="gl-filetree__name" href="${makeUrl(node.type, node.path)}">${node.name}${fileCountText}</a>
+          <button class="gl-filetree__copy" data-path="${node.path}" title="Copy file path">📋</button>
+        `;
+
+            // Copy path button
+            const copyBtn = $('.gl-filetree__copy', row);
+            if (copyBtn) {
+                copyBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(node.path).then(() => {
+                        copyBtn.textContent = '✓';
+                        setTimeout(() => {
+                            copyBtn.textContent = '📋';
+                        }, 1000);
+                    }).catch(() => {
+                        // Fallback for older browsers
+                        const textarea = document.createElement('textarea');
+                        textarea.value = node.path;
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textarea);
+                        copyBtn.textContent = '✓';
+                        setTimeout(() => {
+                            copyBtn.textContent = '📋';
+                        }, 1000);
+                    });
+                });
+            }
+
+            // Toggle children
+            if (isDir && node.children.size > 0) {
+                row.addEventListener('click', (e) => {
+                    // allow ctrl/cmd click on name to open in new tab
+                    if (e.target && (e.target.classList.contains('gl-filetree__name') ||
+                        e.target.classList.contains('gl-filetree__copy') ||
+                        e.target.closest('.gl-filetree__copy'))) return;
+                    li.classList.toggle('is-open');
+                    // Save expanded state
+                    saveExpandedState(ul);
+                });
+            }
+
+            li.appendChild(row);
+
+            if (isDir && node.children.size > 0) {
+                const subUl = document.createElement('ul');
+                subUl.className = 'gl-filetree__ul';
+                // Sort: dirs first, then files; alphabetical
+                const children = Array.from(node.children.values()).sort((a, b) => {
+                    if (a.type !== b.type) return a.type === 'tree' ? -1 : 1;
+                    return a.name.localeCompare(b.name);
+                });
+                for (const child of children) {
+                    subUl.appendChild(createNodeEl(child, depth + 1));
+                }
+                li.appendChild(subUl);
+            }
+            return li;
+        }
+
+        // Build top-level items
+        const top = Array.from(rootNode.children.values()).sort((a, b) => {
+            if (a.type !== b.type) return a.type === 'tree' ? -1 : 1;
+            return a.name.localeCompare(b.name);
+        });
+        for (const child of top) ul.appendChild(createNodeEl(child, 0));
+
+        // Restore expanded state from localStorage
+        function restoreExpandedState() {
+            const saved = GM_getValue(`gl-filetree-expanded-${projectPath}-${branch}`, '[]');
+            try {
+                const expandedPaths = JSON.parse(saved);
+                expandedPaths.forEach(path => {
+                    const dirEl = $(`.gl-filetree__li[data-type="tree"][data-path="${CSS.escape(path)}"]`, ul);
+                    if (dirEl) dirEl.classList.add('is-open');
+                });
+            } catch (e) {
+                // Ignore parse errors
+            }
+        }
+
+        // Save expanded state to localStorage
+        function saveExpandedState(rootUl) {
+            const expanded = [];
+            $$('.gl-filetree__li.is-open[data-type="tree"]', rootUl).forEach(li => {
+                const path = li.dataset.path;
+                if (path) expanded.push(path);
+            });
+            GM_setValue(`gl-filetree-expanded-${projectPath}-${branch}`, JSON.stringify(expanded));
+        }
+
+        // Open directories along the active path
+        if (currentPath) {
+            const parts = currentPath.split('/');
+            let acc = '';
+            for (let i = 0; i < parts.length - 1; i++) {
+                acc = acc ? `${acc}/${parts[i]}` : parts[i];
+                const dirEl = $(`.gl-filetree__li[data-type="tree"][data-path="${CSS.escape(acc)}"]`, ul);
+                if (dirEl) dirEl.classList.add('is-open');
+            }
+            const activeEl = $(`.gl-filetree__li[data-path="${CSS.escape(currentPath)}"] .gl-filetree__row`);
+            if (activeEl) activeEl.scrollIntoView({ block: 'center' });
+        }
+
+        // Restore saved expanded state (after opening active path)
+        restoreExpandedState();
+
+        // Filter behavior - recursively search all items including collapsed folders
+        function searchRecursive(li, term) {
+            const nameEl = $('.gl-filetree__name', li);
+            const text = nameEl ? nameEl.textContent.toLowerCase() : '';
+            const directMatch = text.includes(term);
+
+            // Check children recursively
+            const childUl = $('.gl-filetree__ul', li);
+            let hasMatchingChild = false;
+            if (childUl) {
+                const children = $$('.gl-filetree__li', childUl);
+                for (const child of children) {
+                    if (searchRecursive(child, term)) {
+                        hasMatchingChild = true;
+                    }
+                }
+            }
+
+            // Show if this item matches or has a matching child
+            const shouldShow = directMatch || hasMatchingChild;
+            li.classList.toggle('is-hidden', !shouldShow);
+
+            // Auto-expand folders that contain matches
+            if (hasMatchingChild && li.dataset.type === 'tree') {
+                li.classList.add('is-open');
+            }
+
+            return shouldShow;
+        }
+
+        filterInput.addEventListener('input', () => {
+            const term = filterInput.value.trim().toLowerCase();
+            if (!term) {
+                $$('.gl-filetree__li', ul).forEach(li => {
+                    li.classList.remove('is-hidden');
+                    // Optionally collapse all when clearing search (or keep current state)
+                });
+                return;
+            }
+            // Search recursively starting from top-level items
+            $$('.gl-filetree__li', ul).forEach(li => {
+                searchRecursive(li, term);
+            });
+        });
+
+        // Expand all folders
+        expandAllBtn.addEventListener('click', () => {
+            $$('.gl-filetree__li[data-type="tree"]', ul).forEach(li => {
+                li.classList.add('is-open');
+            });
+            saveExpandedState(ul);
+        });
+
+        // Collapse all folders
+        collapseAllBtn.addEventListener('click', () => {
+            $$('.gl-filetree__li[data-type="tree"]', ul).forEach(li => {
+                li.classList.remove('is-open');
+            });
+            saveExpandedState(ul);
+        });
+
+        // Quick file search modal
+        function showQuickSearch() {
+            const modal = document.createElement('div');
+            modal.className = 'gl-filetree__quicksearch';
+            modal.innerHTML = `
+                <div class="gl-filetree__quicksearch-content">
+                    <input type="text" class="gl-filetree__quicksearch-input" placeholder="Type to search files... (Esc to close)">
+                    <ul class="gl-filetree__quicksearch-results"></ul>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            const input = $('.gl-filetree__quicksearch-input', modal);
+            const results = $('.gl-filetree__quicksearch-results', modal);
+
+            // Collect all files
+            const allFiles = [];
+            function collectFiles(node, path = '') {
+                for (const child of node.children.values()) {
+                    const childPath = path ? `${path}/${child.name}` : child.name;
+                    if (child.type === 'blob') {
+                        allFiles.push({ name: child.name, path: childPath, fullPath: childPath });
+                    } else if (child.type === 'tree') {
+                        collectFiles(child, childPath);
+                    }
+                }
+            }
+            collectFiles(rootNode);
+
+            function updateResults(term) {
+                results.innerHTML = '';
+                if (!term) return;
+                const lowerTerm = term.toLowerCase();
+                const matches = allFiles
+                    .filter(f => f.name.toLowerCase().includes(lowerTerm) || f.path.toLowerCase().includes(lowerTerm))
+                    .slice(0, 20);
+
+                matches.forEach(file => {
+                    const li = document.createElement('li');
+                    li.className = 'gl-filetree__quicksearch-item';
+                    li.innerHTML = `<span class="gl-filetree__quicksearch-name">${file.name}</span><span class="gl-filetree__quicksearch-path">${file.path}</span>`;
+                    li.addEventListener('click', () => {
+                        window.location.href = makeUrl('blob', file.path);
+                    });
+                    results.appendChild(li);
+                });
+            }
+
+            input.addEventListener('input', (e) => {
+                updateResults(e.target.value);
+            });
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    modal.remove();
+                } else if (e.key === 'Enter') {
+                    const firstResult = $('.gl-filetree__quicksearch-item', results);
+                    if (firstResult) firstResult.click();
+                }
+            });
+
+            input.focus();
+        }
+
+        quickSearchBtn.addEventListener('click', showQuickSearch);
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Ctrl+F or Cmd+F to focus search (but only if not in input)
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                filterInput.focus();
+                filterInput.select();
+            }
+            // Ctrl+P or Cmd+P for quick search
+            if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+                e.preventDefault();
+                showQuickSearch();
+            }
+            // Escape to clear search
+            if (e.key === 'Escape' && document.activeElement === filterInput) {
+                filterInput.value = '';
+                filterInput.dispatchEvent(new Event('input'));
+                filterInput.blur();
+            }
+        });
+
+        return container;
+    }
+
+    // Inject sidebar into GitLab layout
+    function injectSidebar(sidebarEl) {
+        const main = document.querySelector('main.content') || document.querySelector('main');
+        if (!main) return false;
+
+        if (document.querySelector('.gl-filetree')) return true; // already injected
+
+        const wrap = document.createElement('div');
+        wrap.className = 'gl-filetree__layout';
+
+        const contentWrap = document.createElement('div');
+        contentWrap.className = 'gl-filetree__content';
+
+        while (main.firstChild) {
+            contentWrap.appendChild(main.firstChild);
+        }
+
+        wrap.appendChild(sidebarEl);
+        wrap.appendChild(contentWrap);
+        main.appendChild(wrap);
+        return true;
+    }
+
+    async function init() {
+        const ctx = parseGitLabUrl();
+        if (!ctx) return; // Not a project page
+        if (!ctx.branch || ctx.branch === 'master') {
+            // Wait a bit for page to load branch info, then retry
+            await sleep(500);
+            const retryCtx = parseGitLabUrl();
+            if (retryCtx && retryCtx.branch && retryCtx.branch !== 'master') {
+                Object.assign(ctx, retryCtx);
+            } else if (!ctx.branch || ctx.branch === 'master') {
+                // Try to get default branch from API
+                try {
+                    const defaultBranch = await getDefaultBranch(ctx);
+                    ctx.branch = defaultBranch;
+                } catch (err) {
+                    // Keep master as fallback
+                }
+            }
+        }
+        if (document.body.dataset.glFiletreeReady === '1') return;
+        document.body.dataset.glFiletreeReady = '1';
+
+        try {
+            const items = await fetchRepoTree(ctx);
+            const tree = buildTree(items);
+            const currentPath = (ctx.repoAction === 'blob' || ctx.repoAction === 'edit') ? ctx.subpath : '';
+            const sidebar = renderTree(tree, {
+                host: ctx.host,
+                projectPath: ctx.projectPath,
+                branch: ctx.branch,
+                currentPath
+            });
+            injectSidebar(sidebar);
+        } catch (err) {
+            console.warn('[GitLab File Tree Sidebar] Error:', err);
+            const toast = document.createElement('div');
+            toast.className = 'gl-filetree__toast';
+            toast.textContent = 'File tree could not load (API/permissions?).';
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
+        }
+    }
+
+    // Re-run on soft navigations (GitLab uses Turbo/History API)
+    function watchRouteChanges() {
+        const pushState = history.pushState;
+        const replaceState = history.replaceState;
+        function rerun() {
+            document.body.dataset.glFiletreeReady = '0';
+            setTimeout(init, 150);
+        }
+        history.pushState = function () { pushState.apply(this, arguments); rerun(); };
+        history.replaceState = function () { replaceState.apply(this, arguments); rerun(); };
+        window.addEventListener('popstate', rerun);
+
+        const obs = new MutationObserver(() => {
+            if (!document.querySelector('.gl-filetree')) {
+                setTimeout(init, 100);
+            }
+        });
+        obs.observe(document.documentElement, { childList: true, subtree: true });
+    }
+
+    // ---------- Styles ----------
+    GM_addStyle(`
+      .gl-filetree__layout {
+        display: grid;
+        grid-template-columns: 260px 1fr; /* slightly narrower sidebar */
+        gap: 12px;
+        align-items: flex-start;
+      }
+  
+      .gl-filetree {
+        position: sticky;
+        top: 64px;
+        max-height: calc(100vh - 80px);
+        overflow: auto;
+        border-radius: 8px;
+        padding: 8px;
+        margin-left: 16px;
+        font-size: 13px;
+        background: #1f2933; /* dark grey similar to GitLab dark surfaces */
+        border: 1px solid #323f4b;
+        box-shadow: 0 6px 16px rgba(0,0,0,.35);
+        color: #e5e7eb;
+      }
+  
+      .gl-filetree__header {
+        display:flex;
+        flex-direction:column;
+        gap:8px;
+        margin-bottom:6px;
+        padding:4px 6px 8px;
+        border-bottom:1px solid rgba(148,163,184,.25);
+      }
+      
+      .gl-filetree__controls {
+        display:flex;
+        gap:6px;
+        align-items:center;
+      }
+      
+      .gl-filetree__btn {
+        flex:1 1 auto;
+        padding:4px 8px;
+        border-radius:4px;
+        border:1px solid rgba(148,163,184,.4);
+        background:#111827;
+        color:#e5e7eb;
+        font-size:11px;
+        cursor:pointer;
+        transition:background .15s ease;
+      }
+      
+      .gl-filetree__btn:hover {
+        background:rgba(31,41,55,.9);
+        border-color:rgba(148,163,184,.6);
+      }
+      
+      .gl-filetree__btn:active {
+        background:rgba(17,24,39,.9);
+      }
+  
+      .gl-filetree__title {
+        font-weight:600;
+        font-size:12px;
+        text-transform:uppercase;
+        letter-spacing:.04em;
+        opacity:.85;
+        white-space:nowrap;
+      }
+  
+      .gl-filetree__filter {
+        flex:1 1 auto;
+        padding:6px 8px;
+        border-radius:6px;
+        border:1px solid rgba(148,163,184,.4);
+        background: #111827;
+        color:#e5e7eb;
+      }
+      .gl-filetree__filter::placeholder {
+        color:#6b7280;
+        font-size:12px;
+      }
+      .gl-filetree__filter:focus {
+        outline:none;
+        border-color:#3b82f6;
+        box-shadow:0 0 0 1px rgba(59,130,246,.7);
+      }
+  
+      .gl-filetree__listwrap {
+        overflow:auto;
+        padding-top:4px;
+        padding-bottom:4px;
+      }
+  
+      .gl-filetree__ul {
+        list-style:none;
+        margin:0;
+        padding-left:0;
+      }
+  
+      .gl-filetree__li {
+        margin:0;
+      }
+  
+      .gl-filetree__row {
+        display:flex;
+        align-items:center;
+        gap:6px;
+        padding:3px 6px;
+        border-radius:6px;
+        cursor:pointer;
+        margin-left: calc(var(--depth, 0) * 10px); /* per-depth indent inside sidebar */
+        user-select:none;
+        color:#e5e7eb;
+      }
+  
+      .gl-filetree__row:hover {
+        background: rgba(31,41,55,.9);
+      }
+  
+      .gl-filetree__row.is-active {
+        background: rgba(37,99,235,.18);
+        box-shadow: inset 0 0 0 1px rgba(59,130,246,.55);
+      }
+  
+      .gl-filetree__row.is-dir .gl-filetree__twisty {
+        width:14px;
+        display:inline-block;
+        transform: rotate(0deg);
+        transition: transform .15s ease;
+        opacity:.7;
+      }
+  
+      .gl-filetree__li.is-open > .gl-filetree__row .gl-filetree__twisty {
+        transform: rotate(90deg);
+        opacity:1;
+      }
+  
+      .gl-filetree__icon {
+        width:16px;
+        flex:0 0 auto;
+        opacity:.95;
+      }
+  
+      .gl-filetree__name {
+        text-decoration:none;
+        color:inherit;
+        flex:1 1 auto;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+      }
+      
+      .gl-filetree__count {
+        opacity:.6;
+        font-size:11px;
+        margin-left:4px;
+      }
+      
+      .gl-filetree__copy {
+        flex:0 0 auto;
+        padding:2px 4px;
+        border:none;
+        background:transparent;
+        color:#9ca3af;
+        font-size:12px;
+        cursor:pointer;
+        opacity:0;
+        transition:opacity .15s ease;
+        margin-left:4px;
+      }
+      
+      .gl-filetree__row:hover .gl-filetree__copy {
+        opacity:1;
+      }
+      
+      .gl-filetree__copy:hover {
+        color:#e5e7eb;
+      }
+  
+      .gl-filetree__li.is-hidden {
+        display:none;
+      }
+  
+      /* Collapse folder children by default, open when .is-open */
+      .gl-filetree__li > .gl-filetree__ul {
+        display: none;
+      }
+      .gl-filetree__li.is-open > .gl-filetree__ul {
+        display: block;
+      }
+  
+      .gl-filetree__toast {
+        position: fixed;
+        right:16px;
+        bottom:16px;
+        background:#111827;
+        color:#e5e7eb;
+        padding:10px 12px;
+        border-radius:8px;
+        box-shadow:0 10px 35px rgba(0,0,0,.6);
+        z-index:9999;
+        font-size:12px;
+        border:1px solid rgba(148,163,184,.4);
+      }
+  
+      @media (max-width: 1100px) {
+        .gl-filetree__layout {
+          grid-template-columns: 1fr;
+        }
+        .gl-filetree {
+          position: relative;
+          top: 0;
+          max-height:none;
+        }
+      }
+  
+      /* Slightly adjust if GitLab dark theme sets body classes */
+      body[data-theme="dark"] .gl-filetree,
+      body.gl-dark .gl-filetree {
+        background: #1f2933;
+        border-color:#323f4b;
+        box-shadow:0 8px 22px rgba(0,0,0,.6);
+      }
+      body[data-theme="dark"] .gl-filetree__row:hover,
+      body.gl-dark .gl-filetree__row:hover {
+        background:#111827;
+      }
+      
+      /* Quick search modal */
+      .gl-filetree__quicksearch {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 10000;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding-top: 100px;
+      }
+      
+      .gl-filetree__quicksearch-content {
+        background: #1f2933;
+        border: 1px solid #323f4b;
+        border-radius: 8px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        width: 600px;
+        max-width: 90vw;
+        max-height: 70vh;
+        display: flex;
+        flex-direction: column;
+      }
+      
+      .gl-filetree__quicksearch-input {
+        padding: 12px 16px;
+        border: none;
+        border-bottom: 1px solid rgba(148,163,184,.25);
+        background: #111827;
+        color: #e5e7eb;
+        font-size: 14px;
+        border-radius: 8px 8px 0 0;
+      }
+      
+      .gl-filetree__quicksearch-input:focus {
+        outline: none;
+        border-bottom-color: #3b82f6;
+      }
+      
+      .gl-filetree__quicksearch-results {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        overflow-y: auto;
+        max-height: 400px;
+      }
+      
+      .gl-filetree__quicksearch-item {
+        padding: 10px 16px;
+        cursor: pointer;
+        border-bottom: 1px solid rgba(148,163,184,.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+      
+      .gl-filetree__quicksearch-item:hover {
+        background: rgba(31,41,55,.9);
+      }
+      
+      .gl-filetree__quicksearch-name {
+        color: #e5e7eb;
+        font-weight: 500;
+      }
+      
+      .gl-filetree__quicksearch-path {
+        color: #9ca3af;
+        font-size: 12px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 0 1 auto;
+      }
+    `);
+
+    // ---------- Bootstrap ----------
+    (async function bootstrap() {
+        for (let i = 0; i < 20; i++) {
+            if (document.querySelector('main')) break;
+            await sleep(150);
+        }
+        watchRouteChanges();
+        init();
+    })();
+})();

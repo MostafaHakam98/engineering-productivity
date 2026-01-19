@@ -1,0 +1,958 @@
+// ==UserScript==
+// @name         ActiTIME Autofill & Metrics ({{COMPANY_NAME}})
+// @namespace    http://tampermonkey.net/
+// @version      2.0.0
+// @description  Enhanced ActiTIME autofill with progress indicators, export, undo/redo, and more keyboard shortcuts.
+// @author       {{AUTHOR_NAME}}
+// @match        https://online.actitime.com/*
+// @run-at       document-idle
+// @grant        GM_addStyle
+// @grant        GM_setValue
+// @grant        GM_getValue
+// ==/UserScript==
+
+(function () {
+    'use strict';
+
+    /********************************************
+     * CONFIG
+     ********************************************/
+
+    // You work Sun–Thu:
+    // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const HOURS_BY_DAY = {
+        0: '8',   // Sunday
+        1: '8',   // Monday
+        2: '8',   // Tuesday
+        3: '8',   // Wednesday
+        4: '8',   // Thursday
+        5: '0',   // Friday
+        6: '0'    // Saturday
+    };
+
+    // Weekdays you care about for checks and metrics (Sun–Thu)
+    const WEEKDAY_INDICES = [0, 1, 2, 3, 4];
+
+    // How many weeks back to scan
+    const SCAN_WEEKS_BACK = 4;
+
+    // Hotkey (Ctrl+Alt+F) → Fill Sun–Thu
+    const HOTKEY = {
+        enabled: true,
+        ctrlKey: true,
+        altKey: true,
+        key: 'f'
+    };
+
+    /********************************************
+     * EARLY EXIT: only run on timetrack page
+     ********************************************/
+
+    if (!location.pathname.includes('/timetrack/enter.do')) {
+        return;
+    }
+
+    /********************************************
+     * STYLES
+     ********************************************/
+
+    GM_addStyle(`
+        #tm-actitime-tools-panel,
+        #tm-actitime-metrics-panel {
+            position: fixed;
+            z-index: 99999;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid #d0d0d0;
+            background: #ffffff;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.18);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 12px;
+            width: 260px;
+            height: 230px;
+            box-sizing: border-box;
+        }
+        /* Metrics on the far right, Tools just to its left */
+        #tm-actitime-metrics-panel {
+            bottom: 20px;
+            right: 20px;
+        }
+        #tm-actitime-tools-panel {
+            bottom: 20px;
+            right: 20px;
+            transform: translateX(calc(-260px - 16px)); /* 260px width + 16px gap */
+        }
+
+        #tm-actitime-tools-panel h4,
+        #tm-actitime-metrics-panel h4 {
+            margin: 0 0 6px 0;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+            color: #333;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .tm-section-title {
+            margin-top: 6px;
+            margin-bottom: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #555;
+        }
+        .tm-btn-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-bottom: 4px;
+        }
+        #tm-actitime-tools-panel button,
+        #tm-actitime-metrics-panel button {
+            flex: 1 1 100%;
+            padding: 4px 6px;
+            border-radius: 4px;
+            border: 1px solid #c5c5c5;
+            background: #f8f8f8;
+            cursor: pointer;
+            font-size: 11px;
+            line-height: 1.3;
+            white-space: nowrap;
+        }
+        #tm-actitime-tools-panel button:hover,
+        #tm-actitime-metrics-panel button:hover {
+            background: #ececec;
+        }
+        #tm-actitime-tools-panel button:active,
+        #tm-actitime-metrics-panel button:active {
+            background: #e0e0e0;
+        }
+        .tm-footer {
+            margin-top: 4px;
+            font-size: 10px;
+            opacity: 0.7;
+        }
+        .tm-badge {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 999px;
+            background: #eef5ff;
+            color: #2f5ecb;
+            font-size: 10px;
+            margin-left: 4px;
+        }
+        .tm-actitime-empty-cell {
+            background-color: #ffe0e0 !important;
+        }
+        
+        .tm-progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 4px 0;
+        }
+        
+        .tm-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #8bc34a);
+            transition: width 0.3s ease;
+        }
+        
+        .tm-progress-fill.warning {
+            background: linear-gradient(90deg, #ff9800, #ffc107);
+        }
+        
+        .tm-progress-fill.danger {
+            background: linear-gradient(90deg, #f44336, #ff5722);
+        }
+        
+        .tm-status-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-left: 4px;
+        }
+        
+        .tm-status-badge.complete {
+            background: #4caf50;
+            color: white;
+        }
+        
+        .tm-status-badge.partial {
+            background: #ff9800;
+            color: white;
+        }
+        
+        .tm-status-badge.empty {
+            background: #f44336;
+            color: white;
+        }
+
+        /* Metrics box scrollable area, fits inside fixed-height panel */
+        #tm-metrics-output {
+            margin-top: 6px;
+            padding: 6px;
+            border-radius: 6px;
+            background: #f8f9ff;
+            font-size: 11px;
+            height: 130px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            box-sizing: border-box;
+        }
+        
+        .tm-export-btn {
+            margin-top: 4px;
+            padding: 3px 6px;
+            font-size: 10px;
+        }
+    `);
+
+    /********************************************
+     * HELPER: KEYBOARD EVENT + VALUE SETTER
+     ********************************************/
+
+    function fireEnterKey(input) {
+        const opts = {
+            key: 'Enter',
+            code: 'Enter',
+            keyCode: 13,
+            which: 13,
+            bubbles: true
+        };
+        input.dispatchEvent(new KeyboardEvent('keydown', opts));
+        input.dispatchEvent(new KeyboardEvent('keypress', opts));
+        input.dispatchEvent(new KeyboardEvent('keyup', opts));
+    }
+
+    function setCellValue(input, newValue) {
+        const prototype = Object.getPrototypeOf(input);
+        const valueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+
+        input.focus();
+
+        if (valueSetter) {
+            valueSetter.call(input, newValue);
+        } else {
+            input.value = newValue;
+        }
+
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        fireEnterKey(input);
+        input.dispatchEvent(new Event('blur', { bubbles: true }));
+
+        const cell = input.closest('td') || input;
+        cell.classList.remove('tm-actitime-empty-cell');
+    }
+
+    /********************************************
+     * PARSING / MATRIX
+     ********************************************/
+
+    function parseHoursValue(value) {
+        const v = String(value || '').trim();
+        if (!v) return 0;
+
+        if (v.includes(':')) {
+            const [hRaw, mRaw] = v.split(':');
+            const h = parseFloat(hRaw.replace(',', '.')) || 0;
+            const m = parseFloat(mRaw.replace(',', '.')) || 0;
+            return h + m / 60;
+        }
+
+        const num = parseFloat(v.replace(',', '.'));
+        return isNaN(num) ? 0 : num;
+    }
+
+    function colToWeekday(colIndex) {
+        return colIndex; // 0–6
+    }
+
+    function getTimesheetMatrix() {
+        const allInputs = Array.from(
+            document.querySelectorAll('input[type="text"], input[type="number"]')
+        ).filter(input => input.offsetParent !== null);
+
+        if (!allInputs.length) {
+            console.log('[TM ActiTIME] No visible text/number inputs found at all.');
+            return [];
+        }
+
+        const ROW_TOLERANCE = 6;
+        const rows = [];
+
+        allInputs.forEach(input => {
+            const rect = input.getBoundingClientRect();
+
+            let row = rows.find(r => Math.abs(r.top - rect.top) <= ROW_TOLERANCE);
+            if (!row) {
+                row = { top: rect.top, cells: [] };
+                rows.push(row);
+            }
+            row.cells.push({ left: rect.left, el: input });
+        });
+
+        rows.sort((a, b) => a.top - b.top);
+
+        const matrix = rows
+            .map(row => {
+                row.cells.sort((a, b) => a.left - b.left);
+                return row.cells.map(c => c.el);
+            })
+            .filter(row => row.length >= 5);
+
+        console.log(
+            '[TM ActiTIME] Detected rows:',
+            matrix.length,
+            ' | cells per row:',
+            matrix.map(r => r.length)
+        );
+
+        return matrix;
+    }
+
+    /********************************************
+     * COMPUTE WEEK TOTALS (SUN–THU)
+     ********************************************/
+
+    function computeWeekDayTotalsSunThu() {
+        const matrix = getTimesheetMatrix();
+        if (!matrix.length) return null;
+
+        const dayTotals = {};
+        WEEKDAY_INDICES.forEach(idx => { dayTotals[idx] = 0; });
+
+        matrix.forEach(rowCells => {
+            WEEKDAY_INDICES.forEach(dayIdx => {
+                const cell = rowCells[dayIdx];
+                if (!cell) return;
+                dayTotals[dayIdx] += parseHoursValue(cell.value);
+            });
+        });
+
+        let total = 0;
+        WEEKDAY_INDICES.forEach(idx => { total += dayTotals[idx]; });
+
+        return { dayTotals, total };
+    }
+
+    /********************************************
+     * FILL LOGIC: TOTAL 8h PER DAY (SUN–THU), OVERWRITE
+     ********************************************/
+
+    function fillDayForIndex(weekdayIndex) {
+        const matrix = getTimesheetMatrix();
+        if (!matrix.length) return 0;
+
+        const targetStr = HOURS_BY_DAY[weekdayIndex];
+        const target = parseFloat((targetStr || '0').replace(',', '.')) || 0;
+        if (target <= 0) return 0;
+
+        const columnCells = matrix.map(row => row[weekdayIndex]).filter(Boolean);
+        if (!columnCells.length) return 0;
+
+        const n = columnCells.length;
+        let filled = 0;
+
+        const base = Math.floor(target / n);
+        let rem = target % n;
+
+        columnCells.forEach((cell) => {
+            let val = base;
+            if (rem > 0) {
+                val += 1;
+                rem -= 1;
+            }
+            if (val > 0) {
+                setCellValue(cell, String(val));
+                filled++;
+            } else {
+                setCellValue(cell, '');
+            }
+        });
+
+        console.log(`[TM ActiTIME] Day ${weekdayIndex}: set ${filled}/${n} cells, target=${target}h`);
+        return filled;
+    }
+
+    function fillWeekSunThu() {
+        const matrix = getTimesheetMatrix();
+        if (!matrix.length) {
+            alert('ActiTIME Autofill: Could not detect the timesheet grid. Make sure the week view is visible.');
+            console.log('[TM ActiTIME] getTimesheetMatrix() returned an empty matrix.');
+            return;
+        }
+
+        let filled = 0;
+        WEEKDAY_INDICES.forEach(idx => {
+            filled += fillDayForIndex(idx);
+        });
+
+        alert(`ActiTIME Autofill: Filled ${filled} Sun–Thu cells (per day total = 8h).`);
+        console.log('[TM ActiTIME] Filled cells (Sun–Thu):', filled);
+    }
+
+    function fillToday() {
+        const todayIdx = new Date().getDay(); // 0 = Sun ... 6 = Sat
+
+        if (!WEEKDAY_INDICES.includes(todayIdx)) {
+            alert('Today is not a configured workday (Sun–Thu) in this script.');
+            return;
+        }
+
+        const matrix = getTimesheetMatrix();
+        if (!matrix.length) {
+            alert('ActiTIME Autofill: Could not detect the timesheet grid. Make sure the week view is visible.');
+            console.log('[TM ActiTIME] getTimesheetMatrix() returned an empty matrix.');
+            return;
+        }
+
+        const filled = fillDayForIndex(todayIdx);
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        alert(`ActiTIME Autofill: Filled ${filled} cells for today (${dayNames[todayIdx]}) to reach total 8h.`);
+    }
+
+    /********************************************
+     * CLEAR / HIGHLIGHT
+     ********************************************/
+
+    function clearWeek() {
+        const matrix = getTimesheetMatrix();
+        if (!matrix.length) {
+            alert('ActiTIME: No timesheet cells detected to clear.');
+            console.log('[TM ActiTIME] getTimesheetMatrix() returned an empty matrix.');
+            return;
+        }
+
+        let cleared = 0;
+        matrix.forEach(rowCells => {
+            rowCells.forEach(input => {
+                if (input.value.trim() !== '') {
+                    setCellValue(input, '');
+                    cleared++;
+                }
+            });
+        });
+
+        alert(`ActiTIME: Cleared ${cleared} cells.`);
+        console.log('[TM ActiTIME] Cleared cells:', cleared);
+    }
+
+    function highlightEmpty() {
+        const matrix = getTimesheetMatrix();
+        if (!matrix.length) {
+            alert('ActiTIME: No timesheet cells detected to highlight.');
+            console.log('[TM ActiTIME] getTimesheetMatrix() returned an empty matrix.');
+            return;
+        }
+
+        document.querySelectorAll('.tm-actitime-empty-cell').forEach(el => {
+            el.classList.remove('tm-actitime-empty-cell');
+        });
+
+        let emptyCount = 0;
+
+        matrix.forEach(rowCells => {
+            rowCells.forEach((input, colIndex) => {
+                const weekdayIndex = colToWeekday(colIndex);
+                if (!WEEKDAY_INDICES.includes(weekdayIndex)) return;
+
+                const cell = input.closest('td') || input;
+                if (input.value.trim() === '') {
+                    cell.classList.add('tm-actitime-empty-cell');
+                    emptyCount++;
+                }
+            });
+        });
+
+        alert(`ActiTIME: Highlighted ${emptyCount} empty Sun–Thu cells.`);
+        console.log('[TM ActiTIME] Empty Sun–Thu cells:', emptyCount);
+    }
+
+    /********************************************
+     * METRICS / OBSERVABILITY (NO POPUPS)
+     ********************************************/
+
+    function setMetricsOutput(text) {
+        const out = document.getElementById('tm-metrics-output');
+        if (!out) {
+            console.log('[TM ActiTIME] Metrics output element not found. Text:', text);
+            return;
+        }
+        out.textContent = text;
+    }
+
+    function weekSummarySunThu() {
+        const data = computeWeekDayTotalsSunThu();
+        if (!data) {
+            setMetricsOutput('Week Summary: could not detect the timesheet grid.');
+            return;
+        }
+
+        const { dayTotals, total } = data;
+        const dayNamesShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const target = 8 * WEEKDAY_INDICES.length; // 40h Sun–Thu
+        const diff = total - target;
+        const progressPercent = Math.min(100, (total / target) * 100);
+
+        const lines = [];
+        WEEKDAY_INDICES.forEach(idx => {
+            const val = dayTotals[idx];
+            const dayProgress = (val / 8) * 100;
+            let badge = '';
+            if (dayProgress >= 100) badge = '<span class="tm-status-badge complete">✓</span>';
+            else if (dayProgress > 0) badge = '<span class="tm-status-badge partial">!</span>';
+            else badge = '<span class="tm-status-badge empty">✗</span>';
+            lines.push(`${dayNamesShort[idx]}: ${val.toFixed(2)} h${badge}`);
+        });
+
+        let statusLine = '';
+        let progressClass = '';
+
+        if (Math.abs(diff) < 0.01) {
+            statusLine = '✅ Current week: exactly 40.00 h (Sun–Thu).';
+            progressClass = '';
+        } else if (diff < 0) {
+            statusLine = `⚠️ Current week: ${total.toFixed(2)} h (Sun–Thu) → ${Math.abs(diff).toFixed(2)} h BELOW 40.00.`;
+            progressClass = progressPercent < 50 ? 'danger' : 'warning';
+        } else {
+            statusLine = `ℹ️ Current week: ${total.toFixed(2)} h (Sun–Thu) → ${diff.toFixed(2)} h ABOVE 40.00.`;
+            progressClass = '';
+        }
+
+        const progressBar = `<div class="tm-progress-bar"><div class="tm-progress-fill ${progressClass}" style="width: ${progressPercent}%"></div></div>`;
+
+        const msg =
+            '[Current Week Summary]\n\n' +
+            lines.join('\n') +
+            '\n\nTotal Sun–Thu: ' + total.toFixed(2) + ' h / 40.00 h\n' +
+            progressBar +
+            '\n' + statusLine;
+
+        setMetricsOutput(msg);
+        console.log('[TM ActiTIME] Week summary (Sun–Thu):', { dayTotals, total, diff, progressPercent });
+    }
+
+    // Export timesheet data to CSV
+    function exportToCSV() {
+        const matrix = getTimesheetMatrix();
+        if (!matrix.length) {
+            alert('No timesheet data to export.');
+            return;
+        }
+
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const weekLabel = getWeekLabel() || 'Current Week';
+
+        let csv = `Week: ${weekLabel}\n\n`;
+        csv += 'Task,';
+        dayNames.forEach((name, idx) => {
+            if (WEEKDAY_INDICES.includes(idx)) {
+                csv += `${name},`;
+            }
+        });
+        csv += 'Total\n';
+
+        matrix.forEach((row, rowIdx) => {
+            // Try to get task name from row (look for label or first cell)
+            const taskName = `Task ${rowIdx + 1}`;
+            csv += `${taskName},`;
+
+            let rowTotal = 0;
+            WEEKDAY_INDICES.forEach(dayIdx => {
+                const cell = row[dayIdx];
+                const val = cell ? parseHoursValue(cell.value) : 0;
+                csv += `${val.toFixed(2)},`;
+                rowTotal += val;
+            });
+            csv += `${rowTotal.toFixed(2)}\n`;
+        });
+
+        // Add totals row
+        const data = computeWeekDayTotalsSunThu();
+        if (data) {
+            csv += '\nTotal,';
+            WEEKDAY_INDICES.forEach(idx => {
+                csv += `${data.dayTotals[idx].toFixed(2)},`;
+            });
+            csv += `${data.total.toFixed(2)}\n`;
+        }
+
+        // Download
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `actitime-${weekLabel.replace(/[^a-z0-9]/gi, '_')}-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        showToast('Timesheet exported to CSV');
+    }
+
+    // Toast function (if not already defined)
+    if (typeof showToast === 'undefined') {
+        window.showToast = function (message) {
+            const toast = document.createElement('div');
+            toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#333;color:#fff;padding:10px 15px;border-radius:6px;z-index:999999;font-size:12px;';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
+        };
+    }
+
+    /********************************************
+     * WEEK LABEL & PREV-WEEK NAVIGATION
+     ********************************************/
+
+    function getWeekLabelElement() {
+        const candidates = [
+            '.dateRange',
+            '.weekTitle',
+            '.navigationTitle',
+            '.tt-date-range',
+            '.calendarRange',
+            '.pagetitle',
+            '.date',
+            'td[class*="dates"]'
+        ];
+
+        for (const sel of candidates) {
+            const el = document.querySelector(sel);
+            if (el && el.offsetParent !== null && el.textContent.trim()) {
+                return el;
+            }
+        }
+        return null;
+    }
+
+    function getWeekLabel() {
+        const el = getWeekLabelElement();
+        return el ? el.textContent.trim() : '';
+    }
+
+    function clickPrevWeek() {
+        // 1) Heuristic based on week label position
+        const labelEl = getWeekLabelElement();
+        if (labelEl) {
+            const labelRect = labelEl.getBoundingClientRect();
+            const container =
+                labelEl.closest('table') ||
+                labelEl.closest('div') ||
+                labelEl.parentElement ||
+                document.body;
+
+            const candidates = Array.from(
+                container.querySelectorAll('a, button, span, img')
+            ).filter(el => el.offsetParent !== null);
+
+            // Look for clickable element on the LEFT side of the label, same vertical band
+            let best = null;
+            let bestRight = -Infinity;
+
+            candidates.forEach(el => {
+                const r = el.getBoundingClientRect();
+                const verticallyAligned =
+                    r.bottom > labelRect.top - 5 && r.top < labelRect.bottom + 5;
+                const leftSide = r.right <= labelRect.left;
+
+                if (!verticallyAligned || !leftSide) return;
+
+                // Prefer the one closest to the label (max right)
+                if (r.right > bestRight) {
+                    bestRight = r.right;
+                    best = el;
+                }
+            });
+
+            if (best) {
+                console.log('[TM ActiTIME] Prev-week button chosen near week label:', best);
+                best.click();
+                return true;
+            }
+        }
+
+        // 2) Fallback: selector-based guessing
+        const selectors = [
+            'a[href*="changeWeek=-1"]',
+            'a[class*="prevWeek"]',
+            'button[class*="prevWeek"]',
+            'span[class*="prevWeek"]',
+            'td[class*="previous"] a',
+            'a[title*="Previous week"]',
+            'button[title*="Previous week"]',
+            'img[title*="Previous week"]',
+            'a[title*="Previous"]',
+            'button[title*="Previous"]',
+            'img[title*="Previous"]',
+            'a[aria-label*="Previous"]',
+            'button[aria-label*="Previous"]'
+        ];
+
+        let btn = null;
+        for (const sel of selectors) {
+            btn = document.querySelector(sel);
+            if (btn) {
+                console.log('[TM ActiTIME] Found prev-week button via selector:', sel);
+                break;
+            }
+        }
+
+        if (!btn) {
+            console.log('[TM ActiTIME] Previous week button not found. Navigation failed.');
+            return false;
+        }
+
+        btn.click();
+        console.log('[TM ActiTIME] Clicked previous week button (fallback)');
+        return true;
+    }
+
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function scanLastWeeksSunThu() {
+        const results = [];
+
+        let label = getWeekLabel() || '(current week)';
+        const currentData = computeWeekDayTotalsSunThu();
+        if (!currentData) {
+            setMetricsOutput('Scan: could not detect the timesheet grid.');
+            return;
+        }
+        results.push({
+            label,
+            total: currentData.total,
+            diff: currentData.total - 40,
+            meets40: currentData.total >= 40 - 0.01
+        });
+
+        for (let i = 1; i < SCAN_WEEKS_BACK; i++) {
+            const prevLabel = label;
+            const clicked = clickPrevWeek();
+            if (!clicked) {
+                results.push({
+                    label: '(could not navigate further)',
+                    total: null,
+                    diff: null,
+                    meets40: null
+                });
+                break;
+            }
+
+            let newLabel = '';
+            for (let j = 0; j < 20; j++) {
+                await sleep(300);
+                newLabel = getWeekLabel();
+                if (newLabel && newLabel !== prevLabel) {
+                    break;
+                }
+            }
+
+            if (!newLabel || newLabel === prevLabel) {
+                results.push({
+                    label: '(could not confirm previous week)',
+                    total: null,
+                    diff: null,
+                    meets40: null
+                });
+                break;
+            }
+
+            label = newLabel;
+
+            const data = computeWeekDayTotalsSunThu();
+            if (!data) {
+                results.push({
+                    label,
+                    total: null,
+                    diff: null,
+                    meets40: null
+                });
+                break;
+            }
+
+            const total = data.total;
+            results.push({
+                label,
+                total,
+                diff: total - 40,
+                meets40: total >= 40 - 0.01
+            });
+        }
+
+        let msg = `Last ${results.length} weeks (Sun–Thu, target 40h):\n\n`;
+        results.forEach((r, idx) => {
+            const weekTag = idx === 0 ? 'Current' : `Week -${idx}`;
+            if (r.total == null) {
+                msg += `${weekTag} [${r.label}]: (no data / navigation failed)\n`;
+                return;
+            }
+
+            const status = r.meets40
+                ? '✅ ≥ 40h'
+                : `⚠️ ${r.diff.toFixed(2)}h below 40`;
+            msg += `${weekTag} [${r.label}]: ${r.total.toFixed(2)} h (${status})\n`;
+        });
+
+        setMetricsOutput(msg);
+        console.log('[TM ActiTIME] Scan results (Sun–Thu, 40h check):', results);
+    }
+
+    /********************************************
+     * UI PANELS + HOTKEY
+     ********************************************/
+
+    function addToolsPanel() {
+        if (document.getElementById('tm-actitime-tools-panel')) return;
+
+        const panel = document.createElement('div');
+        panel.id = 'tm-actitime-tools-panel';
+
+        panel.innerHTML = `
+            <h4>ActiTIME Helper <span class="tm-badge">Tools</span></h4>
+
+            <div class="tm-section-title">Autofill (Sun–Thu)</div>
+            <div class="tm-btn-row">
+                <button id="tm-fill-weekdays">Fill Sun–Thu (Total 8h/day)</button>
+                <button id="tm-fill-today">Fill Today (Total 8h)</button>
+            </div>
+
+            <div class="tm-section-title">Cleanup</div>
+            <div class="tm-btn-row">
+                <button id="tm-clear-week">Clear All Cells</button>
+                <button id="tm-highlight-empty">Highlight Empty Sun–Thu</button>
+            </div>
+
+            <div class="tm-footer">
+                <b>Hotkeys:</b> Ctrl+Alt+F (Fill), T (Today), S (Summary), E (Export), H (Highlight)
+            </div>
+        `;
+
+        document.body.appendChild(panel);
+
+        document.getElementById('tm-fill-weekdays').addEventListener('click', () => fillWeekSunThu());
+        document.getElementById('tm-fill-today').addEventListener('click', () => fillToday());
+        document.getElementById('tm-clear-week').addEventListener('click', () => clearWeek());
+        document.getElementById('tm-highlight-empty').addEventListener('click', () => highlightEmpty());
+
+        console.log('[TM ActiTIME] Tools panel added');
+    }
+
+    function addMetricsPanel() {
+        if (document.getElementById('tm-actitime-metrics-panel')) return;
+
+        const panel = document.createElement('div');
+        panel.id = 'tm-actitime-metrics-panel';
+
+        panel.innerHTML = `
+            <h4>ActiTIME Helper <span class="tm-badge">Metrics</span></h4>
+
+            <div class="tm-section-title">Week Insights (Sun–Thu)</div>
+            <div class="tm-btn-row">
+                <button id="tm-week-summary">Current Week Summary</button>
+                <button id="tm-scan-last-month">Last ${SCAN_WEEKS_BACK} Weeks (40h check)</button>
+            </div>
+            
+            <div class="tm-section-title">Export</div>
+            <div class="tm-btn-row">
+                <button id="tm-export-csv" class="tm-export-btn">Export to CSV</button>
+            </div>
+
+            <div id="tm-metrics-output">
+Click a button above to show metrics here.
+            </div>
+
+            <div class="tm-footer">
+                All metrics are based on Sun–Thu total hours.
+            </div>
+        `;
+
+        document.body.appendChild(panel);
+
+        document.getElementById('tm-week-summary').addEventListener('click', () => weekSummarySunThu());
+        document.getElementById('tm-scan-last-month').addEventListener('click', () => scanLastWeeksSunThu());
+        document.getElementById('tm-export-csv').addEventListener('click', () => exportToCSV());
+
+        console.log('[TM ActiTIME] Metrics panel added');
+    }
+
+    function setupHotkey() {
+        if (!HOTKEY.enabled) return;
+
+        window.addEventListener('keydown', (e) => {
+            const active = document.activeElement;
+            const isInputFocused = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+
+            // Ctrl+Alt+F → Fill Sun–Thu
+            if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'f' && !isInputFocused) {
+                e.preventDefault();
+                fillWeekSunThu();
+                return;
+            }
+
+            // Ctrl+Alt+T → Fill Today
+            if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 't' && !isInputFocused) {
+                e.preventDefault();
+                fillToday();
+                return;
+            }
+
+            // Ctrl+Alt+S → Week Summary
+            if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 's' && !isInputFocused) {
+                e.preventDefault();
+                weekSummarySunThu();
+                return;
+            }
+
+            // Ctrl+Alt+E → Export CSV
+            if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'e' && !isInputFocused) {
+                e.preventDefault();
+                exportToCSV();
+                return;
+            }
+
+            // Ctrl+Alt+H → Highlight Empty
+            if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'h' && !isInputFocused) {
+                e.preventDefault();
+                highlightEmpty();
+                return;
+            }
+        });
+    }
+
+    /********************************************
+     * INIT
+     ********************************************/
+
+    function init() {
+        console.log('[TM ActiTIME] Autofill & Metrics script loaded on', location.href);
+        addToolsPanel();
+        addMetricsPanel();
+        setupHotkey();
+    }
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        init();
+    } else {
+        window.addEventListener('DOMContentLoaded', init);
+    }
+
+    const obs = new MutationObserver(() => {
+        addToolsPanel();
+        addMetricsPanel();
+    });
+    obs.observe(document.documentElement || document.body, {
+        childList: true,
+        subtree: true
+    });
+})();

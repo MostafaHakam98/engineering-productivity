@@ -1,0 +1,5 @@
+# Environment variables
+.env
+
+# Generated/configured scripts (optional - uncomment if you want to keep templates only)
+# TamperMonkey/*.js
