@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "[pre-push] quick checks..."
+
+# If Python exists in repo: block syntax errors fast
+if ls *.py >/dev/null 2>&1 || [ -d "src" ] || [ -f "manage.py" ]; then
+  echo "→ Python compile sanity..."
+  python -m compileall -q . || {
+    echo "❌ Push blocked: python compile failed."
+    exit 1
+  }
+fi
+
+# If Django project: run a tiny test subset (optional)
+if [ -f "manage.py" ]; then
+  echo "→ Django smoke test..."
+  python manage.py test --keepdb -q || {
+    echo "❌ Push blocked: tests failed."
+    exit 1
+  }
+fi
+
+echo "✅ pre-push passed."

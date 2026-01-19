@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "[pre-commit] guardrails..."
+
+# Only staged diffs
+diff="$(git diff --cached)"
+
+# Block TODO/FIXME in staged lines
+if echo "$diff" | grep -nE '^\+.*\b(TODO|FIXME)\b' >/dev/null; then
+  echo "❌ Commit blocked: TODO/FIXME found in staged changes."
+  echo "Tip: remove it or convert it to a tracked issue."
+  exit 1
+fi
+
+# Block debug prints in Python staged lines
+if echo "$diff" | grep -nE '^\+.*\bprint\(' >/dev/null; then
+  echo "❌ Commit blocked: debug print() found in staged changes."
+  exit 1
+fi
+
+# Simple secret heuristics (demo-friendly)
+if echo "$diff" | grep -nE '^\+.*(BEGIN (RSA|OPENSSH) PRIVATE KEY|AWS_SECRET|API[_-]?KEY|TOKEN=)' >/dev/null; then
+  echo "❌ Commit blocked: possible secret detected."
+  exit 1
+fi
+
+echo "✅ pre-commit passed."
