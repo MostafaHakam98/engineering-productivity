@@ -49,6 +49,7 @@ shell/aliases/
 ├── core/           # Core bash settings (history, colors, ls, path)
 ├── navigation/     # Navigation aliases (cd, .., etc.)
 ├── tools/          # General tool aliases (clear, bat, etc.)
+├── ai/             # AI Engineering aliases (Claude Code)
 ├── git/            # Git aliases and helpers
 ├── docker/         # Docker aliases and helpers
 ├── prompt/         # Shell prompt configuration
@@ -103,6 +104,18 @@ Common tool shortcuts:
 - `rmf` - rm -rf
 - `bat` - batcat alias
 - `alert` - Notification for long commands
+
+### `ai/` - AI Engineering (Claude Code)
+
+Claude Code setup and workflow shortcuts:
+
+- `claude-install-global` — Install global Claude config to `~/.claude/`
+- `claude-install-project` — Install project template into current directory's `.claude/`
+- `claude-sync-project` — Sync shared template updates (non-destructive)
+- `cdclaudeconfig` — Navigate to `~/.claude/`
+- `claude-help` — Print all Claude Code commands and slash command reference
+
+Set `ENGPROD_DIR` in `~/.bashrc` to point to your `engineering-productivity` repo if it's not at the default location.
 
 ### `git/` - Git Aliases
 Comprehensive Git shortcuts and helpers.

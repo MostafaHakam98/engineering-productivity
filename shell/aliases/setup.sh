@@ -25,6 +25,7 @@ LOAD_ORDER=(
     "20:core:colors.sh"
     "30:core:ls.sh"
     "40:tools:tools.sh"
+    "45:ai:ai.sh"
     "50:git:git.sh"
     "60:docker:docker.sh"
     "70:prompt:prompt.sh"
