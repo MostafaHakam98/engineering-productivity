@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pwd)",
+      "Bash(ls*)",
+      "Bash(tree*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(find . -maxdepth 3*)",
+      "Bash(grep*)",
+      "Bash(rg*)",
+      "Bash(cmake --preset*)",
+      "Bash(cmake --build*)",
+      "Bash(pytest*)",
+      "Bash(python -m pytest*)",
+      "Bash(pylint*)",
+      "Bash(ruff*)",
+      "Bash(mypy*)"
+    ],
+    "deny": [
+      "Bash(rm -rf*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean -fd*)",
+      "Bash(git push --force*)",
+      "Bash(sudo rm*)",
+      "Bash(chmod -R 777*)",
+      "Bash(chown -R*)"
+    ]
+  }
+}
