@@ -71,7 +71,7 @@ After running `shell/aliases/setup.sh`, the following are available:
 | `claude-install-project` | Install project template into current dir's `.claude/` |
 | `claude-sync-project`    | Sync template updates (non-destructive)                |
 | `cdclaudeconfig`         | Navigate to `~/.claude/`                               |
-| `claude-help`            | Print all commands and slash command reference          |
+| `claude-help`            | Print all commands and slash command reference         |
 
 ## Three-Layer Config Model
 
@@ -81,8 +81,8 @@ After running `shell/aliases/setup.sh`, the following are available:
 | Project template | `AI-Engineering/ClaudeCode/project-template/` | Starter structure — copy once per project   |
 | Project-local    | `<project>/.claude/`                          | Project-specific rules, maps, and workflows |
 
-Personal files under `~/.claude/` should not be committed to product repositories.
-Project-local `.claude/` files should be committed to the project repository.
+Personal files under `~/.claude/` should not be committed to any repository.
+Project-local `.claude/` files are machine-local and should be listed in `.gitignore`. Each engineer runs `/repo-profile` once per project to generate them locally.
 
 ## Documentation
 

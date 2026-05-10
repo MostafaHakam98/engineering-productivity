@@ -40,11 +40,11 @@ claude-install-project
 
 This copies the project template into `.claude/`. Then:
 
-1. Edit `.claude/rules/repo.md` — describe the project architecture
-2. Edit `.claude/rules/build.md` — add build conventions
-3. Fill in `.claude/maps/repo-map.md` — compact structure overview
-4. Fill in `.claude/maps/entrypoints.md` — binaries, CLIs, services
-5. Commit `.claude/` to the project repository
+1. Add `.claude/` to the project's `.gitignore` — these files are machine-local and never committed.
+2. Run `/repo-profile` inside Claude Code — it inspects the repo and fills all `.claude/` files automatically.
+3. Optionally review and refine the generated files.
+
+Each engineer on the project runs steps 1–2 once on their own machine.
 
 ### Step 3 — Sync template updates into an existing project
 

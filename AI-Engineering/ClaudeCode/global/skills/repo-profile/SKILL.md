@@ -20,16 +20,17 @@ When invoked as:
 /repo-profile
 ~~~
 
-do the following by default:
+**Apply immediately. Do not propose. Do not ask for confirmation. Do not show a plan and wait.**
 
-1. Inspect the repository safely.
-2. Update only files under `.claude/`.
-3. Fill project-specific guidance files.
-4. Remove generic TODO/template placeholders when enough evidence exists.
-5. Add assumptions where evidence is incomplete.
-6. Summarize changed files and remaining gaps.
+Execute in one pass:
 
-Do not ask for confirmation unless a required action would modify files outside `.claude/`.
+1. Inspect the repository silently (no intermediate output).
+2. Write or update files under `.claude/` with project-specific content.
+3. Remove all generic TODO/template placeholders where evidence exists.
+4. Add one or more concrete decisions if the evidence clearly supports them.
+5. After all edits are complete, output the required summary.
+
+The only time to pause is if an action would touch files outside `.claude/`.
 
 ## Supported Modes
 
