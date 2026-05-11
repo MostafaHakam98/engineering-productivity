@@ -1,0 +1,97 @@
+# ~/.config/starship.toml
+# Clean engineer prompt: readable, fast, no nerd-font glyphs.
+
+add_newline = true
+command_timeout = 1000
+
+format = """
+$username$directory$git_branch$git_status$docker_context$python$nodejs$cmd_duration
+$character
+"""
+
+# -------------------------
+# USER / HOST (only on SSH)
+# -------------------------
+[username]
+style_user = "bold white"
+style_root = "bold red"
+format = "[$user]($style)"
+show_always = true
+
+[hostname]
+ssh_only = false
+format = "[@$hostname](bold yellow) "
+
+# -------------------------
+# DIRECTORY (simple + stable)
+# -------------------------
+[directory]
+style = "bold cyan"
+truncate_to_repo = true
+truncation_length = 3
+truncation_symbol = "../"
+read_only = ""
+
+# -------------------------
+# GIT (no nerd glyphs)
+# -------------------------
+[git_branch]
+symbol = "git:"
+style = "bold purple"
+format = "[$symbol$branch]($style) "
+
+[git_status]
+style = "bold red"
+format = "[$all_status$ahead_behind]($style) "
+modified = "*"
+staged = "+"
+untracked = "?"
+ahead = "⇡"
+behind = "⇣"
+diverged = "⇕"
+conflicted = "!"
+deleted = "x"
+renamed = "r"
+stashed = "s"
+
+# -------------------------
+# DOCKER (only when relevant)
+# -------------------------
+[docker_context]
+symbol = "docker:"
+style = "bold blue"
+format = "[$symbol$context]($style) "
+only_with_files = true
+
+# -------------------------
+# PYTHON (project-aware, no warnings)
+# -------------------------
+[python]
+symbol = "py:"
+style = "bold green"
+format = "[$symbol$version]($style) "
+detect_extensions = ["py"]
+detect_files = ["pyproject.toml", "requirements.txt", "Pipfile", "poetry.lock"]
+
+# -------------------------
+# NODE
+# -------------------------
+[nodejs]
+symbol = "node:"
+style = "bold green"
+format = "[$symbol$version]($style) "
+detect_extensions = ["js", "ts", "mjs", "cjs"]
+detect_files = ["package.json", ".nvmrc", ".node-version"]
+
+# -------------------------
+# PROMPT SYMBOL
+# -------------------------
+[cmd_duration]
+min_time = 2000
+style = "bold yellow"
+format = "[$duration]($style) "
+
+[character]
+success_symbol = "[➜](bold green) "
+error_symbol   = "[✗](bold red) "
+

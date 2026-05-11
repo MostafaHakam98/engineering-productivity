@@ -1,0 +1,408 @@
+#!/usr/bin/env bash
+# al — shell environment CLI
+# Manages aliases, starship config, and .bashrc health for this toolkit.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+TARGET_DIR="$HOME/.bashrc.d"
+BASHRC="$HOME/.bashrc"
+STARSHIP_SRC="$REPO_DIR/shell/starship/starship.toml"
+STARSHIP_DST="$HOME/.config/starship.toml"
+
+B='\033[0;34m'; G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; D='\033[2m'; NC='\033[0m'
+
+LOAD_ORDER=(
+    "00:core:core.sh"
+    "10:navigation:navigation.sh"
+    "20:core:colors.sh"
+    "30:core:ls.sh"
+    "40:tools:tools.sh"
+    "45:ai:ai.sh"
+    "50:git:git.sh"
+    "60:docker:docker.sh"
+    "70:prompt:prompt.sh"
+    "80:optional:fzf.sh"
+    "90:optional:nvm.sh"
+    "95:optional:atuin.sh"
+    "99:core:path.sh"
+)
+
+# ─── helpers ──────────────────────────────────────────────────────────────────
+
+header() { echo -e "\n${B}$1${NC}"; }
+ok()     { echo -e "  ${G}✓${NC}  $1"; }
+warn()   { echo -e "  ${Y}!${NC}  $1"; }
+fail()   { echo -e "  ${R}✗${NC}  $1"; }
+info()   { echo -e "  ${D}·${NC}  $1"; }
+
+_aliases_method() {
+    local our_file="$TARGET_DIR/00-core.sh"
+    local loader="$SCRIPT_DIR/loader.sh"
+    if grep -qF "$loader" "$BASHRC" 2>/dev/null; then echo "direct"
+    elif [[ -L "$our_file" ]];                        then echo "symlink"
+    elif [[ -f "$our_file" ]];                        then echo "copy"
+    else                                                   echo "none"
+    fi
+}
+
+_aliases_count() {
+    local n=0
+    for entry in "${LOAD_ORDER[@]}"; do
+        IFS=':' read -r num _ file <<< "$entry"
+        [[ -f "$TARGET_DIR/${num}-${file}" || -L "$TARGET_DIR/${num}-${file}" ]] && n=$((n+1))
+    done
+    echo "$n"
+}
+
+# ─── usage ────────────────────────────────────────────────────────────────────
+
+usage() {
+    echo -e "${B}al${NC} — shell environment CLI"
+    echo ""
+    echo -e "  ${G}al install${NC} [copy|symlink|direct]   Install full environment (default: copy)"
+    echo -e "  ${G}al status${NC}                          Show environment status"
+    echo -e "  ${G}al doctor${NC}                          Diagnose issues"
+    echo -e "  ${G}al list${NC} [category]                 List aliases"
+    echo -e "  ${G}al reload${NC}                          Print reload instructions"
+    echo -e "  ${G}al starship${NC} <install|diff|status>  Manage starship config"
+    echo ""
+    echo -e "  ${D}Categories: core  navigation  tools  ai  git  docker  prompt  optional${NC}"
+}
+
+# ─── list ─────────────────────────────────────────────────────────────────────
+
+cmd_list() {
+    local filter="${1:-}"
+    local categories=(core navigation tools ai git docker prompt optional)
+
+    for cat in "${categories[@]}"; do
+        [[ -n "$filter" && "$filter" != "$cat" ]] && continue
+        local dir="$SCRIPT_DIR/$cat"
+        [[ -d "$dir" ]] || continue
+
+        echo -e "${B}── $cat${NC}"
+        for f in "$dir"/*.sh; do
+            [[ -f "$f" ]] || continue
+            grep -E '^alias [a-zA-Z]|^[a-zA-Z_][a-zA-Z0-9_-]*\(\)' "$f" \
+                | sed "s/^alias //; s/=.*//" \
+                | sed "s/().*//" \
+                | sort \
+                | awk '{printf "   %-22s\n", $0}'
+        done
+        echo ""
+    done
+}
+
+# ─── status ───────────────────────────────────────────────────────────────────
+
+cmd_status() {
+    echo -e "${B}Environment status${NC}"
+
+    # Aliases
+    header "Aliases"
+    local method; method=$(_aliases_method)
+    local count; count=$(_aliases_count)
+    local total="${#LOAD_ORDER[@]}"
+
+    if [[ "$method" == "none" ]]; then
+        fail "Not installed — run: al install"
+    else
+        ok "Method: $method"
+        if [[ "$count" -eq "$total" ]]; then
+            ok "Files: $count/$total in ~/.bashrc.d/"
+        else
+            warn "Files: $count/$total in ~/.bashrc.d/ (run: al install to fix)"
+        fi
+    fi
+
+    # Starship
+    header "Starship"
+    if ! command -v starship &>/dev/null; then
+        fail "starship not found in PATH"
+    else
+        ok "Binary: $(starship --version | head -1)"
+        if [[ ! -f "$STARSHIP_DST" ]]; then
+            fail "Config not installed at ~/.config/starship.toml — run: al starship install"
+        elif diff -q "$STARSHIP_SRC" "$STARSHIP_DST" &>/dev/null; then
+            ok "Config: in sync with repo"
+        else
+            warn "Config: differs from repo — run: al starship diff"
+        fi
+    fi
+
+    # .bashrc health
+    header ".bashrc"
+    local preexec_line bash_preexec_pos atuin_pos starship_pos
+    bash_preexec_pos=$(grep -n "bash-preexec\|bash_preexec" "$BASHRC" 2>/dev/null | head -1 | cut -d: -f1 || echo "")
+    atuin_pos=$(grep -n "atuin init bash" "$BASHRC" 2>/dev/null | head -1 | cut -d: -f1 || echo "")
+    starship_pos=$(grep -n "starship init bash" "$BASHRC" 2>/dev/null | head -1 | cut -d: -f1 || echo "")
+
+    if [[ -n "$bash_preexec_pos" ]]; then
+        ok "bash-preexec sourced (line $bash_preexec_pos)"
+    else
+        warn "bash-preexec not found in ~/.bashrc"
+    fi
+    if [[ -n "$atuin_pos" ]]; then
+        ok "atuin init found (line $atuin_pos)"
+    else
+        info "atuin init not found"
+    fi
+    if [[ -n "$starship_pos" ]]; then
+        ok "starship init found (line $starship_pos)"
+    else
+        fail "starship init not found — prompt won't load"
+    fi
+
+    # Ordering check
+    if [[ -n "$bash_preexec_pos" && -n "$atuin_pos" && -n "$starship_pos" ]]; then
+        if [[ "$bash_preexec_pos" -lt "$atuin_pos" && "$bash_preexec_pos" -lt "$starship_pos" ]]; then
+            ok "Load order correct (bash-preexec → atuin → starship)"
+        else
+            fail "Load order wrong — bash-preexec must come before atuin and starship"
+        fi
+    fi
+
+    echo ""
+}
+
+# ─── doctor ───────────────────────────────────────────────────────────────────
+
+cmd_doctor() {
+    local issues=0
+    echo -e "${B}Doctor${NC}"
+    echo ""
+
+    # bash-preexec
+    if [[ -f "$HOME/.bash-preexec.sh" ]]; then
+        ok "~/.bash-preexec.sh exists"
+    else
+        fail "~/.bash-preexec.sh missing — atuin history won't track"
+        info "Install: curl https://raw.githubusercontent.com/rcaloras/bash-preexec/master/bash-preexec.sh -o ~/.bash-preexec.sh"
+        issues=$((issues+1))
+    fi
+
+    # starship binary
+    if command -v starship &>/dev/null; then
+        ok "starship binary found"
+    else
+        fail "starship not installed"
+        info "Install: curl -sS https://starship.rs/install.sh | sh"
+        issues=$((issues+1))
+    fi
+
+    # starship config
+    if [[ -f "$STARSHIP_DST" ]]; then
+        ok "starship config exists"
+        if diff -q "$STARSHIP_SRC" "$STARSHIP_DST" &>/dev/null; then
+            ok "starship config matches repo"
+        else
+            warn "starship config differs from repo — run: al starship diff"
+        fi
+    else
+        fail "starship config missing — run: al starship install"
+        issues=$((issues+1))
+    fi
+
+    # atuin
+    if command -v atuin &>/dev/null; then
+        ok "atuin binary found"
+    else
+        warn "atuin not found (optional)"
+    fi
+
+    # Aliases
+    local count; count=$(_aliases_count)
+    local total="${#LOAD_ORDER[@]}"
+    if [[ "$count" -eq "$total" ]]; then
+        ok "All $total alias files installed"
+    elif [[ "$count" -gt 0 ]]; then
+        warn "$count/$total alias files installed — run: al install"
+        issues=$((issues+1))
+    else
+        fail "Aliases not installed — run: al install"
+        issues=$((issues+1))
+    fi
+
+    # .bashrc ordering
+    local bp atuin star
+    bp=$(grep -n "bash-preexec\|bash_preexec" "$BASHRC" 2>/dev/null | head -1 | cut -d: -f1 || echo "")
+    atuin=$(grep -n "atuin init bash" "$BASHRC" 2>/dev/null | head -1 | cut -d: -f1 || echo "")
+    star=$(grep -n "starship init bash" "$BASHRC" 2>/dev/null | head -1 | cut -d: -f1 || echo "")
+
+    if [[ -n "$bp" && -n "$atuin" && -n "$star" ]]; then
+        if [[ "$bp" -lt "$atuin" && "$bp" -lt "$star" ]]; then
+            ok ".bashrc load order correct"
+        else
+            fail ".bashrc load order wrong — bash-preexec must be before atuin + starship"
+            issues=$((issues+1))
+        fi
+    elif [[ -n "$atuin" || -n "$star" ]]; then
+        warn "bash-preexec not in .bashrc but atuin/starship are — run: al install to patch"
+        issues=$((issues+1))
+    fi
+
+    echo ""
+    if [[ "$issues" -eq 0 ]]; then
+        echo -e "  ${G}All checks passed.${NC}"
+    else
+        echo -e "  ${R}$issues issue(s) found.${NC}"
+    fi
+    echo ""
+}
+
+# ─── install ──────────────────────────────────────────────────────────────────
+
+cmd_install() {
+    local method="${1:-copy}"
+
+    echo -e "${B}Installing environment${NC} (method: $method)"
+    echo ""
+
+    # 1. Aliases
+    header "Aliases"
+    bash "$SCRIPT_DIR/setup.sh" "$method"
+
+    # 2. Starship config
+    header "Starship config"
+    _starship_install
+
+    # 3. .bashrc patches
+    header ".bashrc"
+    _bashrc_patch
+
+    echo ""
+    echo -e "${G}Done.${NC} Open a new terminal or run:"
+    echo -e "  ${Y}source ~/.bashrc${NC}"
+}
+
+# ─── starship subcommand ──────────────────────────────────────────────────────
+
+cmd_starship() {
+    local sub="${1:-status}"
+    case "$sub" in
+        install) _starship_install ;;
+        diff)    _starship_diff ;;
+        status)
+            header "Starship"
+            if ! command -v starship &>/dev/null; then
+                fail "starship not in PATH"
+            else
+                ok "$(starship --version | head -1)"
+                if [[ ! -f "$STARSHIP_DST" ]]; then
+                    fail "Config not installed — run: al starship install"
+                elif diff -q "$STARSHIP_SRC" "$STARSHIP_DST" &>/dev/null; then
+                    ok "Config in sync with repo"
+                else
+                    warn "Config differs from repo — run: al starship diff"
+                fi
+            fi
+            echo ""
+            ;;
+        *) echo -e "${R}Unknown starship subcommand: $sub${NC}"; echo "  Usage: al starship <install|diff|status>"; exit 1 ;;
+    esac
+}
+
+_starship_install() {
+    if [[ ! -f "$STARSHIP_SRC" ]]; then
+        fail "Repo starship config not found at $STARSHIP_SRC"
+        return 1
+    fi
+
+    mkdir -p "$(dirname "$STARSHIP_DST")"
+
+    if [[ -f "$STARSHIP_DST" ]]; then
+        if diff -q "$STARSHIP_SRC" "$STARSHIP_DST" &>/dev/null; then
+            ok "Starship config already up to date"
+            return
+        fi
+        local backup="${STARSHIP_DST}.bak.$(date +%Y%m%d%H%M%S)"
+        cp "$STARSHIP_DST" "$backup"
+        warn "Backed up existing config → $backup"
+    fi
+
+    cp "$STARSHIP_SRC" "$STARSHIP_DST"
+    ok "Installed $STARSHIP_DST"
+}
+
+_starship_diff() {
+    if [[ ! -f "$STARSHIP_DST" ]]; then
+        fail "~/.config/starship.toml not found — run: al starship install"
+        return 1
+    fi
+    echo -e "${B}Diff: repo vs installed${NC}"
+    echo -e "  ${D}--- repo: $STARSHIP_SRC${NC}"
+    echo -e "  ${D}+++ live: $STARSHIP_DST${NC}"
+    echo ""
+    diff --color=always "$STARSHIP_SRC" "$STARSHIP_DST" || true
+}
+
+# ─── .bashrc patching ─────────────────────────────────────────────────────────
+
+_bashrc_patch() {
+    local preexec_snippet='[[ -f ~/.bash-preexec.sh ]] && source ~/.bash-preexec.sh'
+
+    if grep -qF "bash-preexec" "$BASHRC" 2>/dev/null; then
+        ok "bash-preexec already in ~/.bashrc"
+        return
+    fi
+
+    # Find the line before atuin init or starship init — insert before whichever comes first
+    local atuin_line starship_line insert_before
+    atuin_line=$(grep -n "atuin init bash" "$BASHRC" 2>/dev/null | head -1 | cut -d: -f1 || echo "")
+    starship_line=$(grep -n "starship init bash" "$BASHRC" 2>/dev/null | head -1 | cut -d: -f1 || echo "")
+
+    if [[ -n "$atuin_line" || -n "$starship_line" ]]; then
+        # Insert before whichever appears first
+        insert_before="${atuin_line:-$starship_line}"
+        [[ -n "$atuin_line" && -n "$starship_line" && "$starship_line" -lt "$atuin_line" ]] && insert_before="$starship_line"
+
+        local backup="${BASHRC}.bak.$(date +%Y%m%d%H%M%S)"
+        cp "$BASHRC" "$backup"
+        warn "Backed up ~/.bashrc → $backup"
+
+        # Insert the bash-preexec line before the target line
+        sed -i "${insert_before}i\\
+# bash-preexec: must load before atuin and starship\\
+${preexec_snippet}\\
+" "$BASHRC"
+        ok "Injected bash-preexec before line $insert_before"
+    else
+        # No atuin/starship found — append to end
+        local backup="${BASHRC}.bak.$(date +%Y%m%d%H%M%S)"
+        cp "$BASHRC" "$backup"
+        warn "Backed up ~/.bashrc → $backup"
+        printf '\n# bash-preexec: must load before atuin and starship\n%s\n' "$preexec_snippet" >> "$BASHRC"
+        ok "Appended bash-preexec to ~/.bashrc"
+    fi
+}
+
+# ─── reload ───────────────────────────────────────────────────────────────────
+
+cmd_reload() {
+    echo ""
+    echo -e "${Y}Shell reload requires running in your terminal:${NC}"
+    echo ""
+    echo -e "  ${G}source ~/.bashrc${NC}                       # copy or symlink mode"
+    echo -e "  ${G}source $SCRIPT_DIR/loader.sh${NC}   # direct mode"
+    echo ""
+}
+
+# ─── dispatch ─────────────────────────────────────────────────────────────────
+
+case "${1:-}" in
+    install)  cmd_install "${2:-copy}" ;;
+    status)   cmd_status ;;
+    doctor)   cmd_doctor ;;
+    list)     cmd_list "${2:-}" ;;
+    reload)   cmd_reload ;;
+    starship) cmd_starship "${2:-status}" ;;
+    ""|help|--help|-h) usage ;;
+    *)
+        echo -e "${R}Unknown command: $1${NC}"
+        echo ""
+        usage
+        exit 1
+        ;;
+esac
