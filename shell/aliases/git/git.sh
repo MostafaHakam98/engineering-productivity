@@ -108,3 +108,9 @@ gup() {
 
 # Legacy alias for backward compatibility
 alias gitnewbranch='gcbp'
+
+# Re-sync global git hooks from the engineering-productivity repo
+hooks-install-global() {
+    local repo="${ENGPROD_DIR:-$HOME/Desktop/Personal/engineering-productivity}"
+    bash "$repo/git/hooks/install-global.sh"
+}

@@ -39,6 +39,43 @@ _banner() {
 _cursor_hide() { printf '\033[?25l'; }
 _cursor_show() { printf '\033[?25h'; }
 
+# ─── inline option picker ─────────────────────────────────────────────────────
+# Usage: _pick "Option one" "Option two" ...
+# Result in $_PICK_IDX (0-based index of selection)
+
+_pick_draw() {
+    local sel="$1"; shift
+    local i=0
+    for opt in "$@"; do
+        if [[ "$i" -eq "$sel" ]]; then
+            printf "\r  %b▶  %s%b\033[K\n" "$W" "$opt" "$NC"
+        else
+            printf "\r  %b   %s%b\033[K\n" "$D" "$opt" "$NC"
+        fi
+        i=$((i+1))
+    done
+    printf "\r  %b↑ ↓  navigate    Enter  select%b\033[K\n" "$D" "$NC"
+}
+
+_pick() {
+    local -a _opts=("$@")
+    local _n="${#_opts[@]}" _idx=0
+    _pick_draw "$_idx" "${_opts[@]}"
+    _cursor_hide
+    while true; do
+        local _key; _key=$(_read_key)
+        case "$_key" in
+            $'\x1b[A'|k|K) _idx=$(( (_idx - 1 + _n) % _n )) ;;
+            $'\x1b[B'|j|J) _idx=$(( (_idx + 1) % _n ))       ;;
+            $'\n'|$'\r'|'') break ;;
+        esac
+        printf '\033[%dA' $(( _n + 1 ))
+        _pick_draw "$_idx" "${_opts[@]}"
+    done
+    _cursor_show
+    _PICK_IDX="$_idx"
+}
+
 _read_key() {
     local key seq
     IFS= read -r -s -n1 key 2>/dev/null || true
@@ -98,24 +135,18 @@ install_shell() {
     blank
     echo -e "  Installs modular bash aliases and the starship prompt config."
     blank
-    echo -e "  ${D}Choose an installation method:${NC}"
+    echo -e "  ${D}Installation method:${NC}"
     blank
-    echo -e "  ${W}1${NC}  ${G}copy${NC}     Files are copied to ${C}~/.bashrc.d/${NC}"
-    echo -e "           ${D}Stable. Changes require re-running install.${NC}"
+    _pick \
+        "copy     Copy files to ~/.bashrc.d/        — stable, re-run install to update" \
+        "symlink  Symlink files to this repo        — auto-updates on git pull" \
+        "direct   Source repo from ~/.bashrc        — instant changes, no file copying"
     blank
-    echo -e "  ${W}2${NC}  ${C}symlink${NC}  Symlinks point to this repo's files"
-    echo -e "           ${D}Auto-updates when you git pull.${NC}"
-    blank
-    echo -e "  ${W}3${NC}  ${Y}direct${NC}   Repo is sourced directly from ${C}~/.bashrc${NC}"
-    echo -e "           ${D}Instant changes, no file copying.${NC}"
-    blank
-    printf "  Method [1]: "
-    read -r _mc
     local method
-    case "${_mc:-1}" in
-        2|symlink) method="symlink" ;;
-        3|direct)  method="direct"  ;;
-        *)         method="copy"    ;;
+    case "$_PICK_IDX" in
+        1) method="symlink" ;;
+        2) method="direct"  ;;
+        *) method="copy"    ;;
     esac
     blank
     if ! command -v starship &>/dev/null; then
@@ -147,15 +178,13 @@ install_hooks() {
     blank
     echo -e "  ${D}Where should hooks be installed?${NC}"
     blank
-    echo -e "  ${W}1${NC}  ${G}global${NC}   Apply to all git repositories on this machine  ${D}(recommended)${NC}"
-    echo -e "  ${W}2${NC}  ${C}path${NC}     A specific repository you specify"
-    blank
-    printf "  Choice [1]: "
-    read -r _hc
+    _pick \
+        "global   Apply to all git repositories on this machine  (recommended)" \
+        "path     A specific repository you specify"
     blank
 
-    case "${_hc:-1}" in
-        2|path)
+    case "$_PICK_IDX" in
+        1)
             printf "  Repository path: "
             read -r _repo_path
             blank
@@ -170,21 +199,11 @@ install_hooks() {
         *)
             step "Installing hooks globally"
             blank
-            local target="$HOME/.git-hooks"
-            mkdir -p "$target"
-            git config --global core.hooksPath "$target"
-            for hook in pre-commit pre-push; do
-                if [[ -f "$REPO_DIR/git/hooks/$hook" ]]; then
-                    cp "$REPO_DIR/git/hooks/$hook" "$target/"
-                    chmod +x "$target/$hook"
-                    ok "Installed $hook → $target/$hook"
-                fi
-            done
-            blank
-            ok "Global hooks configured: core.hooksPath = $target"
+            bash "$REPO_DIR/git/hooks/install-global.sh"
             blank
             echo -e "  ${W}What's next:${NC}"
             info "Hooks will run automatically on every commit and push"
+            info "hooks-install-global      re-sync hooks from repo at any time"
             info "To bypass (use sparingly):  git commit --no-verify"
             ;;
     esac
@@ -467,6 +486,11 @@ cmd_help() {
     printf "  %b%-28s%b %s\n" "$C" "al list [category]"     "$NC" "List all aliases by category"
     printf "  %b%-28s%b %s\n" "$C" "al starship install"    "$NC" "Install starship config"
     printf "  %b%-28s%b %s\n" "$C" "al starship diff"       "$NC" "Diff repo config vs installed"
+    blank
+    echo -e "  ${W}Git Hooks module${NC}"
+    sep
+    blank
+    printf "  %b%-28s%b %s\n" "$C" "hooks-install-global"   "$NC" "Re-sync ~/.git-hooks/ from repo"
     blank
     echo -e "  ${W}Claude module${NC}"
     sep
