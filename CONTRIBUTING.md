@@ -7,10 +7,14 @@ This document defines what every module in this repository must have, so new mod
 ## Module Types
 
 ### Installable module
-Has a setup script and is registered in `forge`. Examples: `shell/aliases/`, `git/hooks/`, `browser/scripts/`, `ai/claude/`.
+
+Has a setup script and is registered in `forge`. Examples: `shell/aliases/`, `git/hooks/`, `browser/scripts/`,
+`ai/claude/`.
 
 ### Docs-only module
-Contains reference documentation with no setup step. Examples: `shell/terminal/`, `browser/shortcuts/`, `editor/vscode/`, `os/ubuntu/`.
+
+Contains reference documentation with no setup step. Examples: `shell/terminal/`, `browser/shortcuts/`,
+`editor/vscode/`, `os/ubuntu/`.
 
 ---
 
@@ -18,21 +22,21 @@ Contains reference documentation with no setup step. Examples: `shell/terminal/`
 
 ### Every module directory
 
-| File | Required | Notes |
-|---|---|---|
-| `README.md` | Yes | See sections below |
+| File        | Required | Notes              |
+|-------------|----------|--------------------|
+| `README.md` | Yes      | See sections below |
 
 ### Installable modules (additionally)
 
-| File | Required | Notes |
-|---|---|---|
-| `setup.sh` or `scripts/` | Yes | Entry point for `forge install` |
+| File                     | Required | Notes                           |
+|--------------------------|----------|---------------------------------|
+| `setup.sh` or `scripts/` | Yes      | Entry point for `forge install` |
 
 ### Every top-level domain directory (`shell/`, `git/`, `browser/`, `editor/`, `os/`, `ai/`)
 
-| File | Required | Notes |
-|---|---|---|
-| `README.md` | Yes | Lists sub-modules with one-line descriptions and install commands |
+| File        | Required | Notes                                                             |
+|-------------|----------|-------------------------------------------------------------------|
+| `README.md` | Yes      | Lists sub-modules with one-line descriptions and install commands |
 
 ---
 
@@ -61,9 +65,10 @@ CLI reference or usage examples.
 
 ## Files
 
-| File | Purpose |
-|---|---|
+| File         | Purpose      |
+|--------------|--------------|
 | `<filename>` | what it does |
+
 ```
 
 ### Module README (docs-only)
@@ -94,6 +99,7 @@ One-sentence description.
 ## What's Included
 
 ### [<module>/](./<module>/) - <Module Name>
+
 One-line description.
 
 **Installation:** `<command>` or "No installation needed — reference documentation"
@@ -116,6 +122,7 @@ One-line description.
 When adding an installable module, update three places in `forge`:
 
 **1. Status function** — add `_s_<name>()` following the pattern of existing checks:
+
 ```bash
 _s_mymodule() {
   # return "ok", "warn", or "none"
@@ -124,11 +131,13 @@ _s_mymodule() {
 ```
 
 **2. Menu item** — add an entry to `_ITEMS` in `cmd_menu`:
+
 ```bash
 "m:mymodule:Short description of the module:install_mymodule"
 ```
 
 **3. Install function** — add `install_mymodule()` following the pattern of existing installers:
+
 ```bash
 install_mymodule() {
   # print description, prompt for options, run setup, print "What's next"
