@@ -519,7 +519,7 @@ _next_sel() {
     local next=$(( (idx + dir + n) % n ))
     local itype
     while true; do
-        IFS=: read -r itype _ _ _ <<< "${_ITEMS[$next]}:::"
+        local _old_ifs="$IFS"; IFS=: read -r itype _ _ _ <<< "${_ITEMS[$next]}"; IFS="$_old_ifs"
         [[ "$itype" != "s" ]] && break
         next=$(( (next + dir + n) % n ))
     done
@@ -535,7 +535,7 @@ _render() {
 
     for item in "${_ITEMS[@]}"; do
         local itype ilabel idesc iaction
-        IFS=: read -r itype ilabel idesc iaction <<< "${item}:::"
+        local _old_ifs="$IFS"; IFS=: read -r itype ilabel idesc iaction <<< "${item}"; IFS="$_old_ifs"
 
         if [[ "$itype" == "s" ]]; then
             blank; sep; blank
@@ -602,7 +602,7 @@ cmd_menu() {
 
             $'\n'|$'\r'|'')
                 local itype iaction
-                IFS=: read -r itype _ _ iaction <<< "${_ITEMS[$idx]}:::"
+                local _old_ifs="$IFS"; IFS=: read -r itype _ _ iaction <<< "${_ITEMS[$idx]}"; IFS="$_old_ifs"
 
                 # Quit item has empty action
                 [[ "$itype" == "a" && -z "$iaction" ]] && break
