@@ -183,7 +183,7 @@ fbat() {
 }
 
 # Browse files and grep content
-fgrep() {
+ffgrep() {
   local file
   local pattern="${1:-}"
   

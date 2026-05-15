@@ -3,5 +3,9 @@
 .claude/
 .idea/
 
-# Generated/configured scripts (optional - uncomment if you want to keep templates only)
-# TamperMonkey/*.js
+# Generated browser scripts (produced by browser/scripts/setup.sh from templates)
+browser/scripts/*.js
+browser/scripts/*.bak
+
+# Benchmark run outputs (ephemeral — not useful as committed artifacts)
+ai/claude/benchmark/results/

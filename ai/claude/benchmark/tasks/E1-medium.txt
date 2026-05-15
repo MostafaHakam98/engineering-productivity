@@ -1,0 +1,1 @@
+The fkill function in optional/fzf.sh does not handle the case where the user cancels the fzf selection (empty pid). Fix it so fkill exits cleanly without error when no process is selected.

@@ -1,190 +1,113 @@
 # Engineering Productivity
 
-A practical, version-controlled collection of workflows, automations, and tools that reduce friction in daily engineering work. This repository treats productivity as a system: browser-level automation, editor-level refactors, shell workflows, and knowledge shared as code — all designed to be reviewable, reproducible, and installable.
+A version-controlled toolkit for engineering workflow. Shell environment, Git hooks, browser automation, editor shortcuts, and AI tooling — each modular, documented, and independently installable.
 
-## 📚 Overview
+## Quick Start
 
-This repository organizes productivity tools and knowledge into modular, installable components grouped by domain. Each directory contains:
-- **Markdown documentation** explaining the knowledge and workflows
-- **Installation scripts** or instructions for easy setup
-- **Ready-to-use** configurations and scripts
+```bash
+git clone <repo-url>
+cd engineering-productivity
+cp .env.example .env        # fill in your values
+./forge install                # interactive installer
+```
 
-## 🗂️ Structure
+## Modules
 
-The repository is organized by domain:
+| Module | What it does | CLI |
+|---|---|---|
+| **shell** | Modular bash aliases, starship prompt, shell manager | `./forge install shell` |
+| **hooks** | Git pre-commit and pre-push quality checks | `./forge install hooks` |
+| **browser** | TamperMonkey scripts for GitLab and ActiTIME | `./forge install browser` |
+| **claude** | Global Claude Code config — skills, commands, agents | `./forge install claude` |
+
+## Structure
 
 ```
 engineering-productivity/
-├── shell/          # Shell and terminal tools
-│   ├── aliases/    # Bash aliases & configuration
-│   └── terminal/   # Terminal multiplexing (screen/tmux)
-├── git/            # Git tools
-│   └── hooks/      # Pre-commit & pre-push hooks
-├── browser/        # Browser tools and shortcuts
-│   ├── scripts/    # TamperMonkey automation scripts
-│   └── shortcuts/  # Browser keyboard shortcuts
-├── editor/         # Editor tips and shortcuts
-│   └── vscode/     # Visual Studio Code
-└── os/             # Operating system shortcuts
-    └── ubuntu/     # Ubuntu/GNOME
+├── forge                          # Top-level CLI (install, status, doctor, help)
+├── bench                       # Claude Code benchmark runner
+│
+├── shell/
+│   ├── aliases/                # Modular bash aliases with numbered load order
+│   │   └── al                  # Shell environment CLI (install, status, doctor)
+│   ├── starship/               # Starship prompt configuration
+│   └── terminal/               # tmux / screen reference
+│
+├── git/
+│   └── hooks/                  # Pre-commit & pre-push hooks
+│
+├── browser/
+│   ├── scripts/                # TamperMonkey userscripts (configured from .env)
+│   └── shortcuts/              # Chrome keyboard shortcuts reference
+│
+├── editor/
+│   └── vscode/                 # VSCode tips and shortcuts
+│
+├── os/
+│   └── ubuntu/                 # Ubuntu / GNOME shortcuts
+│
+└── ai/
+    └── claude/
+        ├── global/             # Personal config — installs to ~/.claude/
+        ├── project-template/   # Starter .claude/ for any project
+        ├── benchmark/          # Claude Code skill benchmarks
+        └── scripts/            # install-global.sh, install-project.sh, sync-project.sh
 ```
 
-## 🗂️ Components
+## The forge CLI
 
-### [shell/](./shell/) - Shell & Terminal Tools
+```
+forge                   Interactive menu with live module status
+forge install [module]  Install one module or all (prompts for options)
+forge status            Show what's installed across all modules
+forge doctor            Check all dependencies and diagnose issues
+forge help              Full command and alias reference
+```
 
-#### [shell/aliases](./shell/aliases/) - Bash Aliases & Shell Configuration
-Modular bash aliases for Git, Docker, navigation, and more. Organized by category with numbered load order.
+Each module also has its own focused CLI once installed:
 
-**Installation:**
+```
+al                      Shell environment manager (aliases + starship)
+al install              Install with your preferred method
+al status               Show load order and installed files
+al doctor               Diagnose shell environment issues
+al starship install     Install starship prompt config
+
+claude-install-global   Re-sync ~/.claude/ with latest global config
+claude-install-project  Bootstrap .claude/ in a project directory
+claude-sync-project     Pull template updates into an existing project
+claude-help             Print all Claude commands and slash command reference
+```
+
+## Configuration
+
+Browser scripts and some tools read from `.env` at the repo root:
+
 ```bash
-cd shell/aliases
-./setup.sh
+cp .env.example .env
+# Edit .env — required fields:
+#   GITLAB_URL           your GitLab instance (without https://)
+#   COMPANY_NAME         used in script metadata
+#   AUTHOR_NAME          used in @author fields
+#   STORAGE_KEY_PREFIX   short prefix for localStorage keys (2-3 chars)
 ```
 
-**Documentation:** [shell/aliases/README.md](./shell/aliases/README.md)
+## Documentation
 
-#### [shell/terminal](./shell/terminal/) - Terminal Session Management
-Quick reference for terminal multiplexers (`screen` and `tmux`).
+- [shell/aliases/README.md](shell/aliases/README.md) — alias categories, load order, install methods
+- [git/hooks/README.md](git/hooks/README.md) — hook behavior and bypass instructions
+- [browser/scripts/README.md](browser/scripts/README.md) — script setup and TamperMonkey install
+- [ai/claude/README.md](ai/claude/README.md) — Claude Code kit structure
+- [ai/claude/USAGE.md](ai/claude/USAGE.md) — day-to-day Claude Code workflows
 
-**Installation:** No installation needed — reference documentation
+## Philosophy
 
-**Documentation:**
-- [shell/terminal/README.md](./shell/terminal/README.md)
-- [shell/terminal/CheatSheet.md](./shell/terminal/CheatSheet.md)
-
----
-
-### [git/](./git/) - Git Tools
-
-#### [git/hooks](./git/hooks/) - Pre-commit & Pre-push Hooks
-Git hooks that enforce code quality and prevent common mistakes (TODO/FIXME, debug prints, secrets).
-
-**Installation:**
-```bash
-cd git/hooks
-./setup.sh
-# Or specify a repository: ./setup.sh /path/to/repo
-```
-
-**Documentation:** [git/hooks/README.md](./git/hooks/README.md)
+- **Modular** — each component works independently, install only what you need
+- **Version-controlled** — every change is reviewable and reversible
+- **Single entry point** — `./forge` covers installation, status, and help for the whole repo
+- **Keyboard-first** — minimal mouse, maximal shortcuts across every layer
+- **Domain-organized** — grouped by function (`shell/`, `git/`, `browser/`, `ai/`), not by tool
 
 ---
 
-### [browser/](./browser/) - Browser Tools
-
-#### [browser/scripts](./browser/scripts/) - TamperMonkey Automation Scripts
-UserScripts for GitLab and ActiTIME that enhance productivity with keyboard shortcuts and automation.
-
-**Installation:**
-1. Configure `.env` file (copy from `.env.example` and fill in your values)
-2. Run setup script: `cd browser/scripts && ./setup.sh`
-3. Install [Tampermonkey](https://www.tampermonkey.net/) browser extension
-4. Install configured scripts from generated `.js` files
-
-**Documentation:** [browser/scripts/README.md](./browser/scripts/README.md)
-
-**Scripts:**
-- `GitLab-File-Tree.js` - Enhanced GitLab file tree sidebar
-- `GitLab-Issue-MR.js` - Issue to MR helper with auto-suggestions
-- `ActiTime-AutoFill.js` - Time tracking automation
-
-#### [browser/shortcuts](./browser/shortcuts/) - Browser Keyboard Shortcuts
-Keyboard shortcuts and workflows for efficient browser usage (Chrome-focused).
-
-**Installation:** No installation needed — reference documentation
-
-**Documentation:**
-- [browser/shortcuts/README.md](./browser/shortcuts/README.md)
-- [browser/shortcuts/ChromeShortcuts.md](./browser/shortcuts/ChromeShortcuts.md)
-
----
-
-### [editor/](./editor/) - Editor Tools
-
-#### [editor/vscode](./editor/vscode/) - Visual Studio Code
-Productivity tips and keyboard shortcuts for VSCode.
-
-**Installation:** No installation needed — reference documentation
-
-**Documentation:**
-- [editor/vscode/README.md](./editor/vscode/README.md)
-- [editor/vscode/VSCode.md](./editor/vscode/VSCode.md)
-
----
-
-### [os/](./os/) - Operating System Tools
-
-#### [os/ubuntu](./os/ubuntu/) - Ubuntu/GNOME
-OS-level keyboard shortcuts and commands for efficient system navigation.
-
-**Installation:** No installation needed — reference documentation
-
-**Documentation:**
-- [os/ubuntu/README.md](./os/ubuntu/README.md)
-- [os/ubuntu/Ubuntu.md](./os/ubuntu/Ubuntu.md)
-
----
-
-## 🚀 Quick Start
-
-1. **Clone this repository:**
-   ```bash
-   git clone <repo-url>
-   cd engineering-productivity
-   ```
-
-2. **Install components you need:**
-   ```bash
-   # Bash aliases (recommended)
-   cd shell/aliases && ./setup.sh
-   
-   # Git hooks (for your repositories)
-   cd git/hooks && ./setup.sh /path/to/your/repo
-   
-   # Browser scripts (configure .env first)
-   cp .env.example .env
-   # Edit .env with your values
-   cd browser/scripts && ./setup.sh
-   ```
-
-3. **Read the documentation:**
-   - Each directory has a `README.md` with detailed information
-   - Markdown files contain specific knowledge and shortcuts
-
-## 📖 Philosophy
-
-This repository follows these principles:
-
-- **Modular**: Each component is independent and can be used separately
-- **Documented**: Every component has clear documentation
-- **Installable**: Automated setup scripts where possible
-- **Version-controlled**: Track changes and share improvements
-- **Keyboard-first**: Minimize mouse usage, maximize efficiency
-- **Context-aware**: Organize by workspace, not by application
-- **Domain-organized**: Grouped by functional area for easy navigation
-
-## 🔧 Customization
-
-All components are designed to be customized:
-
-- **Aliases**: Edit `.sh` files to match your workflow
-- **Git Hooks**: Modify regex patterns and checks
-- **Browser Scripts**: Configure via `.env` file
-- **Documentation**: Add your own tips and shortcuts
-
-## 🤝 Contributing
-
-Feel free to:
-- Add new components
-- Improve existing documentation
-- Share your own productivity workflows
-- Fix issues and suggest improvements
-
-## 📝 License
-
-This is a personal productivity repository. Use and modify as needed for your own workflows.
-
----
-
-> **Remember**: Productivity tools are only effective if they reduce friction. If something doesn't work for you, customize it or remove it.
+> Productivity tools only work if they reduce friction. If something doesn't fit your workflow, customize it or remove it.

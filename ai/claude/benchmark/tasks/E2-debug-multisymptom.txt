@@ -1,0 +1,6 @@
+After sourcing loader.sh, three things are broken simultaneously:
+  1. The prompt shows raw escape codes like \[\033[0;32m\] instead of colors
+  2. fzf keybindings (Ctrl+R, Ctrl+T) do not respond
+  3. The 'mkcd' function is not found
+
+No errors were printed during sourcing. Debug the root cause — do not treat these as three separate bugs.

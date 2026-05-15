@@ -1,64 +1,57 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Setup script to install Git hooks
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOKS_DIR="$SCRIPT_DIR"
 
+G='\033[0;32m'; R='\033[0;31m'; D='\033[2m'; NC='\033[0m'
+ok()   { echo -e "  ${G}✓${NC}  $*"; }
+fail() { echo -e "  ${R}✗${NC}  $*"; }
+info() { echo -e "  ${D}·${NC}  $*"; }
+
 # Determine target directory
 if [ -d ".git" ]; then
-    # We're in a git repository
     TARGET_DIR=".git/hooks"
-    echo "Installing hooks in current repository..."
-elif [ -n "$1" ]; then
-    # Target directory provided as argument
+    echo "  Installing hooks in current repository..."
+elif [ -n "${1:-}" ]; then
     if [ ! -d "$1/.git" ]; then
-        echo "❌ Error: $1 is not a git repository"
+        fail "Not a git repository: $1"
         exit 1
     fi
     TARGET_DIR="$1/.git/hooks"
-    echo "Installing hooks in $1..."
+    echo "  Installing hooks in $1..."
 else
-    # Ask user
-    read -p "Enter path to git repository (or press Enter for global install): " repo_path
+    read -rp "  Repository path (or Enter for global install): " repo_path
     if [ -z "$repo_path" ]; then
-        # Global install
-        git config --global core.hooksPath ~/.git-hooks || true
+        git config --global core.hooksPath ~/.git-hooks
         TARGET_DIR="$HOME/.git-hooks"
         mkdir -p "$TARGET_DIR"
-        echo "Installing hooks globally in $TARGET_DIR..."
+        echo "  Installing hooks globally in $TARGET_DIR..."
     else
         if [ ! -d "$repo_path/.git" ]; then
-            echo "❌ Error: $repo_path is not a git repository"
+            fail "Not a git repository: $repo_path"
             exit 1
         fi
         TARGET_DIR="$repo_path/.git/hooks"
-        echo "Installing hooks in $repo_path..."
+        echo "  Installing hooks in $repo_path..."
     fi
 fi
 
-# Create target directory if it doesn't exist
 mkdir -p "$TARGET_DIR"
 
-# Copy hooks
 echo ""
-echo "Copying hooks..."
 for hook in pre-commit pre-push; do
     if [ -f "$HOOKS_DIR/$hook" ]; then
-        cp -v "$HOOKS_DIR/$hook" "$TARGET_DIR/"
+        cp "$HOOKS_DIR/$hook" "$TARGET_DIR/"
         chmod +x "$TARGET_DIR/$hook"
-        echo "✅ Installed $hook"
+        ok "Installed $hook"
     fi
 done
 
 echo ""
-echo "✅ Setup complete!"
+ok "Setup complete"
 echo ""
-echo "Hooks are now active. They will run automatically on:"
-echo "  - pre-commit: Before each commit"
-echo "  - pre-push: Before each push"
-echo ""
-echo "To bypass (use sparingly):"
-echo "  git commit --no-verify"
-echo "  git push --no-verify"
+info "Hooks run automatically on every commit and push"
+info "To bypass (use sparingly):  git commit --no-verify"

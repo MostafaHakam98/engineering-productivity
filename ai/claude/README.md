@@ -26,13 +26,13 @@ It is designed to:
 Install personal global config:
 
 ~~~bash
-./scripts/install-global-claude.sh
+./scripts/install-global.sh
 ~~~
 
 Install project-local template from inside a project:
 
 ~~~bash
-/path/to/engineering-productivity/AI-Engineering/ClaudeCode/scripts/install-project-claude.sh
+/path/to/engineering-productivity/ai/claude/scripts/install-project.sh
 ~~~
 
 Project-specific files should be committed to the project repository.
@@ -43,11 +43,11 @@ Personal files under `~/.claude/` should not be committed to product repositorie
 
 Use three layers:
 
-| Layer                  | Location                                      | Purpose                                                      |
-|------------------------|-----------------------------------------------|--------------------------------------------------------------|
-| Personal global config | `~/.claude/`                                  | Personal Claude behavior, reusable skills, reusable commands |
-| Reusable template      | `AI-Engineering/ClaudeCode/project-template/` | Starter `.claude/` structure for projects                    |
-| Project-local config   | `<project>/.claude/`                          | Project-specific rules, maps, workflows, and decisions       |
+| Layer                  | Location                      | Purpose                                                      |
+|------------------------|-------------------------------|--------------------------------------------------------------|
+| Personal global config | `~/.claude/`                  | Personal Claude behavior, reusable skills, reusable commands |
+| Reusable template      | `ai/claude/project-template/` | Starter `.claude/` structure for projects                    |
+| Project-local config   | `<project>/.claude/`          | Project-specific rules, maps, workflows, and decisions       |
 
 ## Notes
 

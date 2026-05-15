@@ -1,0 +1,4 @@
+loader.sh fails with this error when sourced:
+  bash: /home/user/.bashrc.d/50-git.sh: No such file or directory
+
+The file exists at shell/aliases/git/git.sh. Debug why it fails and fix it.

@@ -1,0 +1,1 @@
+After running setup.sh, all aliases load correctly but ls output shows no colors and the prompt has no colors either. No error messages appear. Debug why colors are absent and fix it.

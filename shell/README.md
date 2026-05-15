@@ -15,6 +15,17 @@ cd shell/aliases
 
 **Documentation:** [aliases/README.md](./aliases/README.md)
 
+### [starship/](./starship/) - Starship Prompt
+Clean, fast shell prompt. Readable without nerd fonts, shows git status, context, and command duration.
+
+**Installation:**
+```bash
+cd shell/aliases
+./al starship install
+```
+
+**Documentation:** [starship/README.md](./starship/README.md)
+
 ### [terminal/](./terminal/) - Terminal Session Management
 Quick reference for terminal multiplexers (`screen` and `tmux`).
 
@@ -26,6 +37,7 @@ Quick reference for terminal multiplexers (`screen` and `tmux`).
 
 This directory is organized by tool type:
 - `aliases/` - Bash aliases and shell configuration
+- `starship/` - Starship prompt configuration
 - `terminal/` - Terminal multiplexing (screen/tmux)
 
 ## Philosophy

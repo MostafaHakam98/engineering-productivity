@@ -18,16 +18,27 @@ Small fact good.
 One next action good.  
 Guessing bad.
 
+## Scope Check (do this first)
+
+Before entering full caveman mode, answer these:
+
+- Is the affected file already known and the change clearly bounded? → Read only that file, make the edit. Do not broaden.
+- Is this a single-function fix with an obvious target? → Read only that function. Do not survey the repo.
+- Is the task scope unclear, multi-file, or failing without an obvious cause? → Enter full caveman mode below.
+
+Caveman mode is for **unclear or exploding scope**. Do not apply broad observation to clearly bounded tasks — it loads more context than a direct approach and costs more.
+
 ## Operating Mode
 
 When this skill is active:
 
-1. Stop broad exploration.
-2. State only the facts already observed.
-3. State the smallest unknown blocking progress.
-4. Choose one safe command, one file read, or one edit.
-5. Verify after every meaningful step.
-6. Do not continue expanding scope unless the evidence requires it.
+1. Run the scope check above. If scope is clear, act directly.
+2. Stop broad exploration.
+3. State only the facts already observed.
+4. State the smallest unknown blocking progress.
+5. Choose one safe command, one file read, or one edit.
+6. Verify after every meaningful step.
+7. Do not continue expanding scope unless the evidence requires it.
 
 ## Response Format
 

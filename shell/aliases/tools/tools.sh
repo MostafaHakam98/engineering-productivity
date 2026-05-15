@@ -7,12 +7,12 @@ alias mkdirp='mkdir -p'
 alias rmf='rm -rf'
 
 # Tool shortcuts
-alias bat='batcat'
+command -v batcat >/dev/null 2>&1 && alias bat='batcat'  # Debian/Ubuntu; elsewhere bat is already bat
 alias vpn='sudo openfortivpn'
 alias pycharm='/opt/jetbrains/pycharm-*/bin/pycharm.sh'
 
 # Long-running command notification
-alert() {
+nalert() {
   local icon
   if [ $? = 0 ]; then
     icon="terminal"

@@ -7,7 +7,7 @@ TARGET_DIR="$PWD/.claude"
 
 if [ -d "$TARGET_DIR" ]; then
   echo "Project .claude directory already exists: $TARGET_DIR"
-  echo "Refusing to overwrite. Use sync-project-claude.sh instead."
+  echo "Refusing to overwrite. Use sync-project.sh instead."
   exit 1
 fi
 

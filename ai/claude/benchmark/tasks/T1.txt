@@ -1,0 +1,1 @@
+Add a git alias called 'glog' that runs: git log --oneline --graph --decorate --all

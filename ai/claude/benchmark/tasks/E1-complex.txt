@@ -1,0 +1,1 @@
+In optional/fzf.sh, the bat/batcat binary detection pattern (command -v bat / command -v batcat) is duplicated across fcd, fe, fls, fcat, fvim, fbat, and frecent. Refactor to use a single shared helper function that returns the right bat binary, then update all callers to use it.

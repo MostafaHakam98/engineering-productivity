@@ -7,19 +7,19 @@
 # Install personal global Claude config to ~/.claude/
 claude-install-global() {
     local repo="${ENGPROD_DIR:-$HOME/Desktop/Personal/engineering-productivity}"
-    bash "$repo/AI-Engineering/ClaudeCode/scripts/install-global-claude.sh"
+    bash "$repo/ai/claude/scripts/install-global.sh"
 }
 
 # Install project Claude template into current directory's .claude/
 claude-install-project() {
     local repo="${ENGPROD_DIR:-$HOME/Desktop/Personal/engineering-productivity}"
-    bash "$repo/AI-Engineering/ClaudeCode/scripts/install-project-claude.sh"
+    bash "$repo/ai/claude/scripts/install-project.sh"
 }
 
 # Sync shared Claude template files into current project (non-destructive)
 claude-sync-project() {
     local repo="${ENGPROD_DIR:-$HOME/Desktop/Personal/engineering-productivity}"
-    bash "$repo/AI-Engineering/ClaudeCode/scripts/sync-project-claude.sh"
+    bash "$repo/ai/claude/scripts/sync-project.sh"
 }
 
 # Navigate to personal Claude global config
