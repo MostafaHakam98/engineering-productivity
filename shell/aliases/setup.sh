@@ -20,7 +20,12 @@ _ensure_bashrc_sourcing() {
 }
 
 mkdir -p "$TARGET_DIR"
-find "$TARGET_DIR" -maxdepth 1 -name '[0-9][0-9]-*.sh' -delete 2>/dev/null || true
+
+# Only remove files this script previously installed — never touch unmanaged files
+while IFS=: read -r num cat file; do
+    _skip "$num" && continue
+    rm -f "$TARGET_DIR/${num}-${file}"
+done < "$CONF"
 
 case "$METHOD" in
     copy)

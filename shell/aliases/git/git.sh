@@ -109,6 +109,39 @@ gup() {
 # Legacy alias for backward compatibility
 alias gitnewbranch='gcbp'
 
+# Git bundle — offline transport of repo history
+alias gbun='git bundle'
+alias gbun-v='git bundle verify'
+alias gbun-l='git bundle list-heads'
+
+# Create a full bundle of all refs (default name: <repo>.bundle)
+gbun-create() {
+    local name="${1:-$(basename "$(git rev-parse --show-toplevel)").bundle}"
+    git bundle create "$name" --all && echo "Created: $name"
+}
+
+# Create an incremental bundle from a base ref to HEAD
+# Usage: gbun-inc <since-ref> [outfile]   e.g. gbun-inc HEAD~20
+gbun-inc() {
+    if [[ -z "${1:-}" ]]; then
+        echo "Usage: gbun-inc <since-ref> [outfile]"
+        return 1
+    fi
+    local since="$1"
+    local name="${2:-incremental.bundle}"
+    git bundle create "$name" "${since}..HEAD" && echo "Created: $name"
+}
+
+# Fetch from a bundle into the current repo
+# Usage: gbun-apply <bundle-file>
+gbun-apply() {
+    if [[ -z "${1:-}" ]]; then
+        echo "Usage: gbun-apply <bundle-file>"
+        return 1
+    fi
+    git fetch "$1"
+}
+
 # Re-sync global git hooks from the engineering-productivity repo
 hooks-install-global() {
     local repo="${ENGPROD_DIR:-$HOME/Desktop/Personal/engineering-productivity}"
