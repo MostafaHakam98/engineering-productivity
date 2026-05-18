@@ -37,7 +37,7 @@ Analyze CI failures and propose the smallest safe pipeline, script, or code fix.
 
 ## Output Format
 
-~~~md
+```md
 ## Failed Area
 
 ...
@@ -61,4 +61,4 @@ Analyze CI failures and propose the smallest safe pipeline, script, or code fix.
 ## Verification
 
 ...
-~~~
+```

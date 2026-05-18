@@ -29,7 +29,7 @@ Debug failures by identifying the first real error and applying the smallest use
 
 ## Output Format
 
-~~~md
+```md
 ## Failure
 
 ...
@@ -53,7 +53,7 @@ Debug failures by identifying the first real error and applying the smallest use
 ## Verification
 
 ...
-~~~
+```
 
 ## Rules
 

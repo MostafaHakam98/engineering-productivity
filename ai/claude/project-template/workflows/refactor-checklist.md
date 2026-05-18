@@ -33,7 +33,7 @@ After refactoring:
 
 ## Review Summary Format
 
-~~~md
+```md
 ## Refactor Goal
 
 ...
@@ -53,4 +53,4 @@ Expected: none / yes
 ## Risks
 
 ...
-~~~
+```

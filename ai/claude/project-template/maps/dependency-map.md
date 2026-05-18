@@ -10,12 +10,12 @@ Fill this per project.
 
 Example:
 
-~~~text
+```text
 CLI / API layer
     -> service layer
     -> domain layer
     -> infrastructure layer
-~~~
+```
 
 ## Rules
 

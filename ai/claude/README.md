@@ -25,15 +25,15 @@ It is designed to:
 
 Install personal global config:
 
-~~~bash
+```bash
 ./scripts/install-global.sh
-~~~
+```
 
 Install project-local template from inside a project:
 
-~~~bash
+```bash
 /path/to/engineering-productivity/ai/claude/scripts/install-project.sh
-~~~
+```
 
 Project-specific files should be committed to the project repository.
 

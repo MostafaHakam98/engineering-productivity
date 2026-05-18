@@ -41,17 +41,17 @@ Common classes:
 
 ## Useful Commands
 
-~~~bash
+```bash
 git status --short
 git diff --stat
 git diff
 rg "<error-symbol-or-term>"
 find . -maxdepth 3 -type f
-~~~
+```
 
 ## Debugging Summary Format
 
-~~~md
+```md
 ## Failure
 
 ...
@@ -75,4 +75,4 @@ find . -maxdepth 3 -type f
 ## Verification
 
 ...
-~~~
+```

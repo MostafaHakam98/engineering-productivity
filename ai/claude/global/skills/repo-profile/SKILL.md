@@ -16,9 +16,9 @@ project with less repeated exploration.
 
 When invoked as:
 
-~~~text
+```text
 /repo-profile
-~~~
+```
 
 **Apply immediately. Do not propose. Do not ask for confirmation. Do not show a plan and wait.**
 
@@ -36,41 +36,41 @@ The only time to pause is if an action would touch files outside `.claude/`.
 
 ### Default Apply Mode
 
-~~~text
+```text
 /repo-profile
-~~~
+```
 
 Inspect and update `.claude/` files directly.
 
 ### Inspect Mode
 
-~~~text
+```text
 /repo-profile inspect
-~~~
+```
 
 Inspect the repository and propose updates without editing.
 
 ### Refresh Mode
 
-~~~text
+```text
 /repo-profile refresh
-~~~
+```
 
 Update existing `.claude/` files based on current repository state.
 
 ### Check Mode
 
-~~~text
+```text
 /repo-profile check
-~~~
+```
 
 Check whether `.claude/` files are complete and specific enough. Do not edit.
 
 ### Decisions Mode
 
-~~~text
+```text
 /repo-profile decisions
-~~~
+```
 
 Suggest architecture decision records based only on strong evidence. Do not invent decisions.
 
@@ -121,12 +121,12 @@ Start with:
 
 Prefer shallow commands:
 
-~~~bash
+```bash
 pwd
 git status --short
 find . -maxdepth 2 -type d | sort
 find . -maxdepth 2 -type f | sort
-~~~
+```
 
 Avoid by default:
 
@@ -156,7 +156,7 @@ Avoid by default:
 
 After editing, return:
 
-~~~md
+```md
 ## Updated Files
 
 - ...
@@ -176,15 +176,15 @@ After editing, return:
 ## Recommended Next Command
 
 ...
-~~~
+```
 
 ## Required Verification
 
 After editing, run:
 
-~~~bash
+```bash
 grep -RIn "TODO\\|Fill this\\|Update this" .claude || true
 find .claude -maxdepth 3 -type f | sort
-~~~
+```
 
 Then summarize remaining placeholders.

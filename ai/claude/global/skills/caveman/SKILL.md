@@ -44,7 +44,7 @@ When this skill is active:
 
 Use this structure:
 
-~~~md
+```md
 ## Facts
 
 - ...
@@ -64,7 +64,7 @@ Use this structure:
 ## Stop Condition
 
 ...
-~~~
+```
 
 ## Rules
 
@@ -87,7 +87,7 @@ For failures:
 
 ## Build Failure Caveman Flow
 
-~~~text
+```text
 failed command
 -> failing phase
 -> failing target
@@ -95,18 +95,18 @@ failed command
 -> owner CMake/source file
 -> one patch
 -> rebuild same target
-~~~
+```
 
 ## CI Failure Caveman Flow
 
-~~~text
+```text
 failed job
 -> failed command
 -> first real error
 -> local reproduction command
 -> smallest config/code fix
 -> rerun same job/stage
-~~~
+```
 
 ## Output Constraints
 

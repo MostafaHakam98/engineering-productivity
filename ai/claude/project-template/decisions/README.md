@@ -18,7 +18,7 @@ Use names like:
 
 Use this structure:
 
-~~~md
+```md
 # Decision Title
 
 ## Status
@@ -40,7 +40,7 @@ What this affects.
 ## Claude Guidance
 
 How Claude should behave because of this decision.
-~~~
+```
 
 ## Rule
 

@@ -37,7 +37,7 @@ Fix native build issues using target-local, minimal, architecture-aware changes.
 
 ## Output Format
 
-~~~md
+```md
 ## Phase
 
 ...
@@ -61,4 +61,4 @@ Fix native build issues using target-local, minimal, architecture-aware changes.
 ## Rebuild Command
 
 ...
-~~~
+```

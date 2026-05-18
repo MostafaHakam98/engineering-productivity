@@ -23,7 +23,7 @@ Review in this order:
 
 ## Output Format
 
-~~~md
+```md
 ## Blockers
 
 - ...
@@ -39,7 +39,7 @@ Review in this order:
 ## Questions
 
 - ...
-~~~
+```
 
 ## Finding Format
 

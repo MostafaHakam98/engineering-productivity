@@ -18,10 +18,10 @@ Fill this section per project.
 
 Example:
 
-~~~bash
+```bash
 cmake --preset <preset>
 cmake --build --preset <preset> -j"$(nproc)"
-~~~
+```
 
 ## Rule
 

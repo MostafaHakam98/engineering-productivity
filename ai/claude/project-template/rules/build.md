@@ -12,16 +12,16 @@
 
 Prefer:
 
-~~~bash
+```bash
 cmake --preset <preset>
 cmake --build --preset <preset> -j"$(nproc)"
-~~~
+```
 
 For specific targets:
 
-~~~bash
+```bash
 cmake --build --preset <preset> --target <target> -j"$(nproc)"
-~~~
+```
 
 ## Debugging Build Failures
 

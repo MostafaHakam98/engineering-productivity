@@ -1,0 +1,52 @@
+---
+description: Primary project guide — progressive disclosure, token discipline, and rule index
+alwaysApply: true
+---
+
+# Project Guide
+
+## Primary Rule
+
+Do not scan the whole repository by default.
+
+Use progressive disclosure:
+
+1. Read this rule.
+2. Load only the relevant rule below when the task matches.
+3. Inspect only the files needed for the current task.
+
+## Always Follow
+
+- Prefer targeted reads over broad exploration.
+- Before editing, identify the smallest set of files likely to change.
+- For non-trivial work, explore first, then plan, then edit.
+- Do not rewrite unrelated files.
+- Do not perform large refactors unless explicitly requested.
+- Prefer small, reviewable patches.
+- Preserve existing architecture, naming, and style unless the task asks for redesign.
+- After changes, run the narrowest relevant verification command.
+
+## Available Rules
+
+Load these when relevant (reference with `@ruleName` or let the AI load automatically):
+
+- `@shared` — general engineering behavior and change discipline
+- `@repo` — repository architecture and boundaries
+- `@build` — build/CMake/Docker conventions
+- `@testing` — test and validation rules
+- `@style` — code style and review conventions
+
+## Available Maps
+
+Load these when relevant:
+
+- `@repo-map` — compact repository structure
+- `@entrypoints` — CLIs, binaries, services, app entrypoints
+- `@dependency-map` — dependency direction and architecture boundaries
+- `@ownership-map` — component ownership
+
+## Token Discipline
+
+- Do not open generated files, build directories, vendored dependencies, or large logs unless needed.
+- Summarize large outputs instead of pasting them back.
+- Prefer `git diff --stat`, `git status`, targeted grep, and focused file reads.

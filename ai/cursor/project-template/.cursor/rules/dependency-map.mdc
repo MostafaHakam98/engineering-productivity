@@ -1,0 +1,41 @@
+---
+description: Dependency direction and architecture boundaries for this project
+alwaysApply: false
+---
+
+# Dependency Map
+
+## Purpose
+
+This rule describes allowed and forbidden dependency directions so the AI does not introduce architectural violations.
+
+## Allowed Dependency Direction
+
+Fill this section per project.
+
+```
+orchestration  →  runtime
+runtime        →  core
+core           →  (nothing internal)
+```
+
+## Forbidden Dependencies
+
+Fill this section per project.
+
+- `core` must not import from `orchestration`
+- `runtime` must not import from `orchestration`
+
+## External Dependencies
+
+Fill this section per project.
+
+| Component | External Dependencies | Notes |
+|---|---|---|
+| `core` | none | Update this |
+| `runtime` | none | Update this |
+
+## Notes
+
+- Delete placeholder rows and fill with actual project structure.
+- Keep this in sync with the repo map.

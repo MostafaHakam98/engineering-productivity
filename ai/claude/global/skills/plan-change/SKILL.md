@@ -31,7 +31,7 @@ Use this skill when:
 
 ## Plan Format
 
-~~~md
+```md
 ## Goal
 
 ...
@@ -52,7 +52,7 @@ Use this skill when:
 ## Verification
 
 - ...
-~~~
+```
 
 ## Rules
 
