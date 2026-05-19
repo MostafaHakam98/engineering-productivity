@@ -17,7 +17,20 @@
       "Bash(python -m pytest*)",
       "Bash(pylint*)",
       "Bash(ruff*)",
-      "Bash(mypy*)"
+      "Bash(mypy*)",
+      "Bash(safe-git status*)",
+      "Bash(safe-git diff*)",
+      "Bash(safe-git log*)",
+      "Bash(safe-git branch*)",
+      "Bash(safe-git checkout*)",
+      "Bash(safe-git add*)",
+      "Bash(safe-git commit*)",
+      "Bash(safe-git push*)",
+      "Bash(safe-glab mr*)",
+      "Bash(safe-glab issue*)",
+      "Bash(safe-glab label list*)",
+      "Bash(safe-glab pipeline*)",
+      "Bash(safe-glab repo*)"
     ],
     "deny": [
       "Bash(rm -rf*)",
