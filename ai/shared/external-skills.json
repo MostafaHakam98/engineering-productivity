@@ -1,0 +1,91 @@
+{
+  "$comment": [
+    "Third-party skills used alongside this kit. They are DECLARED here, not vendored,",
+    "so upstream stays updatable and their licenses stay with their owners.",
+    "",
+    "ai/scripts/install-external-skills.sh clones each source at its pinned ref into",
+    "'root' and symlinks the listed skills into each target's skills directory.",
+    "pi/metwally additionally discovers ~/.agents/skills natively, walking up from cwd.",
+    "",
+    "'ref' pins the upstream revision. Bump it deliberately, then re-run the installer.",
+    "Upstream renames skills between revisions, so 'path' is recorded per skill and is",
+    "only valid for the pinned ref. Re-verify paths whenever you bump one.",
+    "",
+    "COLLISION: mattpocock/skills also ships a 'caveman' skill. This kit has its own",
+    "authored caveman (ai/shared/skills/caveman) with different behaviour, so upstream's",
+    "is deliberately NOT listed here. Installing it would shadow yours."
+  ],
+  "root": "~/.agents/skills",
+  "sources": [
+    {
+      "name": "vercel-labs-skills",
+      "url": "https://github.com/vercel-labs/skills.git",
+      "ref": "e4243fbf7d9398722024f62850ece90fa0d5c693",
+      "skills": [
+        {
+          "name": "find-skills",
+          "path": "skills/find-skills"
+        }
+      ]
+    },
+    {
+      "name": "mattpocock-skills",
+      "url": "https://github.com/mattpocock/skills.git",
+      "ref": "b8be62ffacb0118fa3eaa29a0923c87c8c11985c",
+      "skills": [
+        {
+          "name": "diagnose",
+          "path": "skills/engineering/diagnose"
+        },
+        {
+          "name": "grill-with-docs",
+          "path": "skills/engineering/grill-with-docs"
+        },
+        {
+          "name": "improve-codebase-architecture",
+          "path": "skills/engineering/improve-codebase-architecture"
+        },
+        {
+          "name": "prototype",
+          "path": "skills/engineering/prototype"
+        },
+        {
+          "name": "setup-matt-pocock-skills",
+          "path": "skills/engineering/setup-matt-pocock-skills"
+        },
+        {
+          "name": "tdd",
+          "path": "skills/engineering/tdd"
+        },
+        {
+          "name": "to-issues",
+          "path": "skills/engineering/to-issues"
+        },
+        {
+          "name": "to-prd",
+          "path": "skills/engineering/to-prd"
+        },
+        {
+          "name": "triage",
+          "path": "skills/engineering/triage"
+        },
+        {
+          "name": "zoom-out",
+          "path": "skills/engineering/zoom-out"
+        },
+        {
+          "name": "grill-me",
+          "path": "skills/productivity/grill-me"
+        },
+        {
+          "name": "handoff",
+          "path": "skills/productivity/handoff"
+        },
+        {
+          "name": "write-a-skill",
+          "path": "skills/productivity/write-a-skill"
+        }
+      ]
+    }
+  ]
+}

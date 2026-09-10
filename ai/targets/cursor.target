@@ -1,0 +1,24 @@
+# Cursor — https://cursor.com
+TARGET_LABEL="Cursor"
+TARGET_HOME="$HOME/.cursor"
+
+INSTRUCTIONS_DEST="$TARGET_HOME/rules/working-style.mdc"
+INSTRUCTIONS_TITLE="Global Engineering Preferences"
+INSTRUCTIONS_FORMAT="mdc-always"
+
+# Cursor has no skill loader; each skill becomes an agent-requestable rule.
+SKILLS_DEST="$TARGET_HOME/rules"
+SKILLS_FORMAT="mdc"
+
+COMMANDS_DEST="$TARGET_HOME/commands"
+COMMANDS_FORMAT="md"
+
+# No subagent concept.
+AGENTS_DEST=""
+AGENTS_FORMAT=""
+
+PERMISSIONS_DEST=""
+PERMISSIONS_FORMAT=""
+
+PROJECT_DEST=".cursor"
+PROJECT_FORMAT="mdc-project"

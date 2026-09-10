@@ -1,58 +1,52 @@
-# Claude Code Productivity Kit
+# Claude Code Kit
 
-Reusable Claude Code configuration for engineering workflows.
+Claude Code is one **target** of the shared AI kit. The content it installs —
+instructions, skills, commands, agents, permissions, project template — lives
+in [`ai/shared/`](../shared/), not here. See [`ai/README.md`](../README.md) for
+the porting model.
 
-## Purpose
+This directory holds what is Claude-specific: the benchmarks, and thin script
+shims kept so existing aliases keep working.
 
-This directory contains reusable Claude Code skills, commands, agents, hooks, and project templates.
-
-It is designed to:
-
-- reduce repeated prompting
-- improve code review consistency
-- improve debugging discipline
-- reduce unnecessary repository scanning
-- enforce safer command execution
-- provide reusable engineering workflows across projects
-
-## Structure
-
-- `global/` installs into `~/.claude/`
-- `project-template/` installs into a project-local `.claude/`
-- `scripts/` contains install and sync scripts
-
-## Recommended Usage
-
-Install personal global config:
+## Install
 
 ```bash
-./scripts/install-global.sh
+ai-install claude          # canonical
+claude-install-global      # alias for the same thing
+forge install claude
 ```
 
-Install project-local template from inside a project:
+Renders `ai/shared/` into Claude Code's dialect and installs it:
+
+| Kit artifact | Lands at |
+|---|---|
+| `instructions.md` | `~/.claude/CLAUDE.md` |
+| `skills/<n>/` | `~/.claude/skills/<n>/` (SKILL.md, references/, scripts/) |
+| `commands/<n>.md` | `~/.claude/commands/<n>.md` |
+| `agents/<n>.md` | `~/.claude/agents/<n>.md` |
+| `permissions.json` | merged into `~/.claude/settings.json` |
+
+Permissions are merged, so your model choice, theme and machine-local allow
+rules survive a re-install.
+
+Set `CLAUDE_CONFIG_DIR` to install somewhere other than `~/.claude`.
+
+## Project config
 
 ```bash
-/path/to/engineering-productivity/ai/claude/scripts/install-project.sh
+ai-install-project claude   # writes .claude/ here
 ```
 
-Project-specific files should be committed to the project repository.
+Then run `/repo-profile` inside a Claude Code session to fill in the
+project-specific rules and maps.
 
-Personal files under `~/.claude/` should not be committed to product repositories.
+## Benchmarks
 
-## Recommended Model
+`benchmark/` measures skill effectiveness against Claude Code specifically.
 
-Use three layers:
+```bash
+./bench <task>              # from the repo root
+```
 
-| Layer                  | Location                      | Purpose                                                      |
-|------------------------|-------------------------------|--------------------------------------------------------------|
-| Personal global config | `~/.claude/`                  | Personal Claude behavior, reusable skills, reusable commands |
-| Reusable template      | `ai/claude/project-template/` | Starter `.claude/` structure for projects                    |
-| Project-local config   | `<project>/.claude/`          | Project-specific rules, maps, workflows, and decisions       |
-
-## Notes
-
-- Keep `CLAUDE.md` files short.
-- Prefer skills for repeatable workflows.
-- Prefer project maps for repository understanding.
-- Prefer decisions for architecture constraints.
-- Avoid putting large documentation directly into startup context.
+Tasks live in `benchmark/tasks/`, experiments in `benchmark/experiments/`.
+Run outputs land in `benchmark/results/` and are gitignored.

@@ -1,0 +1,27 @@
+# Metwally Coding Agent (VS Code front-end for pi)
+#   extension: https://github.com/MostafaHakam98/metwally-vscode
+#   agent:     pi — resource dir defaults to ~/.pi/agent (PI_CODING_AGENT_DIR)
+TARGET_LABEL="Metwally (pi)"
+TARGET_HOME="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
+
+# pi appends APPEND_SYSTEM.md to the system prompt for every session.
+# SYSTEM.md would REPLACE the coding-assistant prompt — do not target it.
+INSTRUCTIONS_DEST="$TARGET_HOME/APPEND_SYSTEM.md"
+INSTRUCTIONS_TITLE="Global Engineering Preferences"
+
+SKILLS_DEST="$TARGET_HOME/skills"
+SKILLS_FORMAT="skill-dir"
+
+COMMANDS_DEST="$TARGET_HOME/prompts"
+COMMANDS_FORMAT="md"
+
+# pi has no subagent concept.
+AGENTS_DEST=""
+AGENTS_FORMAT=""
+
+PERMISSIONS_DEST=""
+PERMISSIONS_FORMAT=""
+
+# Project resources require piVscode.trustProject (pi --approve) in the extension.
+PROJECT_DEST=".pi"
+PROJECT_FORMAT="pi-project"

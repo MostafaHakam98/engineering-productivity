@@ -1,0 +1,21 @@
+# Claude Code — https://claude.com/claude-code
+TARGET_LABEL="Claude Code"
+TARGET_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+
+INSTRUCTIONS_DEST="$TARGET_HOME/CLAUDE.md"
+INSTRUCTIONS_TITLE="Global Claude Preferences"
+
+SKILLS_DEST="$TARGET_HOME/skills"
+SKILLS_FORMAT="skill-dir"
+
+COMMANDS_DEST="$TARGET_HOME/commands"
+COMMANDS_FORMAT="md"
+
+AGENTS_DEST="$TARGET_HOME/agents"
+AGENTS_FORMAT="md"
+
+PERMISSIONS_DEST="$TARGET_HOME/settings.json"
+PERMISSIONS_FORMAT="claude-settings"
+
+PROJECT_DEST=".claude"
+PROJECT_FORMAT="claude-project"

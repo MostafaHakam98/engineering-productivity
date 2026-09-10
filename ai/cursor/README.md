@@ -1,67 +1,48 @@
-# Cursor Productivity Kit
+# Cursor Kit
 
-Reusable Cursor configuration for engineering workflows.
+Cursor is one **target** of the shared AI kit. The content it installs lives in
+[`ai/shared/`](../shared/), not here. See [`ai/README.md`](../README.md) for the
+porting model.
 
-## Purpose
+This directory holds only script shims kept so existing paths keep working.
 
-This directory contains reusable Cursor rules and project templates.
-
-It is designed to:
-
-- reduce repeated prompting
-- improve code review consistency
-- improve debugging discipline
-- reduce unnecessary repository scanning
-- enforce safer command execution
-- provide reusable engineering workflows across projects
-
-## Structure
-
-- `global/` installs into `~/.cursor/rules/`
-- `project-template/` installs into a project-local `.cursor/`
-- `scripts/` contains install scripts
-
-## Recommended Usage
-
-Install personal global config:
+## Install
 
 ```bash
-./scripts/install-global.sh
+ai-install cursor
+forge install cursor
 ```
 
-Install project-local template from inside a project:
+| Kit artifact | Lands at |
+|---|---|
+| `instructions.md` | `~/.cursor/rules/working-style.mdc` (`alwaysApply: true`) |
+| `skills/<n>/` | `~/.cursor/rules/<n>.mdc` (`alwaysApply: false`) |
+| `commands/<n>.md` | `~/.cursor/commands/<n>.md` |
+
+## How skills become rules
+
+Cursor has no skill loader, so each skill is converted to a single `.mdc` rule:
+the SKILL.md frontmatter becomes Cursor's `description` + `alwaysApply: false`,
+which is what makes the rule agent-requestable — Cursor pulls it in when the
+description matches the task, the same trigger a skill uses.
+
+A skill's bundled `references/` and `scripts/` cannot travel into a single
+file. Rather than drop them silently, the generated rule ends with a
+**Bundled Resources** section listing their repo-relative paths so the agent can
+read them on demand.
+
+Subagents and permission rules are not installed — Cursor has neither concept.
+
+## Project config
 
 ```bash
-/path/to/engineering-productivity/ai/cursor/scripts/install-project.sh
+ai-install-project cursor   # writes .cursor/rules/ here
 ```
 
-Project-specific files should be committed to the project repository.
+The shared project template's rules, maps and workflows are flattened into
+Cursor's single `rules/` directory as `.mdc` files, with cross-references
+rewritten to match. The template's entry point becomes `project.mdc` with
+`alwaysApply: true`.
 
-Personal files under `~/.cursor/rules/` should not be committed to product repositories.
-
-## Layer Model
-
-| Layer                  | Location                       | Purpose                                            |
-|------------------------|--------------------------------|----------------------------------------------------|
-| Personal global rules  | `~/.cursor/rules/`             | Personal AI behavior, reusable workflow rules      |
-| Reusable template      | `ai/cursor/project-template/`  | Starter `.cursor/` structure for projects          |
-| Project-local rules    | `<project>/.cursor/rules/`     | Project-specific rules, maps, and architecture     |
-
-## How Cursor Rules Work
-
-Cursor rules are `.mdc` files with frontmatter that controls when they are loaded:
-
-| Type             | Frontmatter                     | When loaded                                      |
-|------------------|---------------------------------|--------------------------------------------------|
-| Always Apply     | `alwaysApply: true`             | Every chat and Composer session                  |
-| Auto Attached    | `globs: "*.ts,*.tsx"`           | When a matching file is open in context          |
-| Agent Requested  | `description: "..."`            | AI decides based on description match            |
-| Manual           | _(none of the above)_           | Only when referenced with `@ruleName` in chat    |
-
-## Notes
-
-- Keep `alwaysApply` rules short — they load every session.
-- Use Agent Requested rules for workflow guidance (debug, review, plan).
-- Use Auto Attached rules for language or toolchain-specific rules.
-- Fill in project maps after installing the template.
-- Reference rules manually with `@ruleName` in Cursor chat when needed.
+Project rules should be committed to the product repository. Personal rules
+under `~/.cursor/rules/` should not.

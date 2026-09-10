@@ -2,6 +2,11 @@
 
 Practical workflows for setting up and using the Claude Code module day-to-day.
 
+Claude Code is one target of the shared AI kit: the content lives in
+`ai/shared/` and is rendered into each agent's dialect. See
+[`ai/README.md`](../README.md) for the porting model and the other targets
+(Codex, Cursor, Metwally).
+
 ## Prerequisites
 
 1. [Claude Code CLI](https://claude.ai/code) installed (`claude` available in PATH)
@@ -19,12 +24,12 @@ Run once on a new machine to install your personal Claude Code config into `~/.c
 ```bash
 ./forge install claude
 # or directly:
-ai/claude/scripts/install-global.sh
+ai/scripts/install-global.sh claude
 # or via shell alias (after forge install shell):
 claude-install-global
 ```
 
-This installs `ai/claude/global/` into `~/.claude/`, giving you:
+This renders `ai/shared/` into Claude Code's dialect and installs it into `~/.claude/`, giving you:
 
 - Personal `CLAUDE.md` with behavior and style rules
 - Slash commands: `/review`, `/debug`, `/plan`, `/caveman`, `/ci-fix`, `/cmake-fix`, `/repo-profile`
@@ -150,14 +155,15 @@ export ENGPROD_DIR="$HOME/code/engineering-productivity"
 
 ### Adding a new global skill
 
-1. Create `ai/claude/global/skills/<name>/SKILL.md`
-2. Reference it from a command in `ai/claude/global/commands/`
-3. Re-run `claude-install-global` to push to `~/.claude/`
+1. Create `ai/shared/skills/<name>/SKILL.md`
+2. Reference it from a command in `ai/shared/commands/`
+3. Re-run `ai-install claude` to push to `~/.claude/`, or `ai-install all` to
+   push the same skill to Codex, Cursor and Metwally too
 
 ### Adding a new slash command
 
-1. Create `ai/claude/global/commands/<name>.md`
-2. Re-run `claude-install-global`
+1. Create `ai/shared/commands/<name>.md`
+2. Re-run `ai-install claude` (or `ai-install all`)
 3. Use as `/<name>` inside a Claude Code session
 
 ---
@@ -179,7 +185,7 @@ Check that `ENGPROD_DIR` points to the correct location:
 
 ```bash
 echo "${ENGPROD_DIR:-$HOME/Desktop/Personal/engineering-productivity}"
-ls "${ENGPROD_DIR:-$HOME/Desktop/Personal/engineering-productivity}/ai/claude/scripts/"
+ls "${ENGPROD_DIR:-$HOME/Desktop/Personal/engineering-productivity}/ai/scripts/"
 ```
 
 **`claude-install-project` refuses to run**

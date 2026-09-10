@@ -114,8 +114,45 @@ _s_browser() {
     else echo "none"; fi
 }
 
-_s_claude() {
-    [[ -f "$HOME/.claude/CLAUDE.md" ]] && echo "ok" || echo "none"
+# AI config is installed per target; report across all declared targets.
+_ai_targets() {
+    local t
+    for t in "$REPO_DIR"/ai/targets/*.target; do
+        [[ -f "$t" ]] && basename "$t" .target
+    done
+}
+
+# _ai_target_installed <target> -> 0 if this kit installed into it
+_ai_target_installed() {
+    local home
+    home=$(bash -c 'set -a; . "'"$REPO_DIR"'/ai/targets/'"$1"'.target"; printf %s "$TARGET_HOME"')
+    [[ -f "$home/.engineering-productivity.manifest" ]]
+}
+
+_s_ai() {
+    local n=0 total=0 t
+    while read -r t; do
+        [[ -n "$t" ]] || continue
+        total=$((total + 1))
+        _ai_target_installed "$t" && n=$((n + 1))
+    done < <(_ai_targets)
+    if   [[ "$n" -eq 0 ]];      then echo "none"
+    elif [[ "$n" -eq "$total" ]]; then echo "ok"
+    else echo "warn"; fi
+}
+
+_s_ext() {
+    local n=0 total=0 d id
+    for d in "$REPO_DIR"/extensions/*/; do
+        [[ -f "$d/extension.json" ]] || continue
+        total=$((total + 1))
+        id=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["extensionId"])' "$d/extension.json" 2>/dev/null)
+        [[ -n "$id" ]] && ls -d "$HOME/.vscode/extensions/${id,,}"-* &>/dev/null && n=$((n + 1))
+    done
+    if   [[ "$total" -eq 0 ]]; then echo "none"
+    elif [[ "$n" -eq 0 ]];     then echo "none"
+    elif [[ "$n" -eq "$total" ]]; then echo "ok"
+    else echo "warn"; fi
 }
 
 _badge() {
@@ -246,20 +283,22 @@ install_browser() {
     info "To reconfigure:  run 'forge install browser' after editing .env"
 }
 
-install_claude() {
+install_ai() {
     blank
-    echo -e "  ${W}Claude Code Config${NC}"
+    echo -e "  ${W}AI Agent Config${NC}"
     sep
     blank
-    echo -e "  Installs your personal Claude Code configuration into ${C}~/.claude/${NC}"
+    echo -e "  One shared source in ${C}ai/shared/${NC} is rendered into every agent's"
+    echo -e "  own dialect. Adding a new agent means adding one ${C}ai/targets/*.target${NC} file."
     blank
-    echo -e "  ${D}You'll get:${NC}"
+    echo -e "  ${D}You'll get, per target:${NC}"
     blank
-    info "CLAUDE.md          global behavior, style, and token discipline rules"
-    info "Slash commands     /review  /debug  /plan  /caveman  /ci-fix  /cmake-fix"
-    info "Skills             code-review  debug  plan-change  ci-fix  cmake-fix"
-    info "Agents             build-doctor  code-reviewer  test-planner"
+    info "Instructions       global behavior, style, and token discipline rules"
+    info "Skills             code-review  debug  plan-change  ci-fix  cmake-fix  checkpoint  vibe-audit  caveman  repo-profile"
+    info "Commands           /review  /debug  /plan  /caveman  /ci-fix  /cmake-fix  /repo-profile"
+    info "Agents             build-doctor  code-reviewer  test-planner  (where supported)"
     blank
+
     if ! command -v rsync &>/dev/null; then
         fail "rsync is required but not installed"
         info "Install:  sudo apt-get install rsync   # Debian/Ubuntu"
@@ -267,15 +306,72 @@ install_claude() {
         return 1
     fi
 
-    step "Installing to ~/.claude/"
+    local -a targets=() labels=()
+    local t label home
+    while read -r t; do
+        [[ -n "$t" ]] || continue
+        label=$(sed -n 's/^TARGET_LABEL="\(.*\)"$/\1/p' "$REPO_DIR/ai/targets/$t.target")
+        home=$(bash -c 'set -a; . "'"$REPO_DIR"'/ai/targets/'"$t"'.target"; printf %s "$TARGET_HOME"')
+        targets+=("$t"); labels+=("$label  ${D}($home)${NC}")
+    done < <(_ai_targets)
+
+    echo -e "  ${D}Which agent should receive the config?${NC}"
     blank
-    bash "$REPO_DIR/ai/claude/scripts/install-global.sh"
+    _pick "All targets" "${labels[@]}"
+    blank
+
+    if [[ "$_PICK_IDX" -eq 0 ]]; then
+        step "Installing into every target"
+        blank
+        bash "$REPO_DIR/ai/scripts/install-global.sh" all
+    else
+        t="${targets[$((_PICK_IDX - 1))]}"
+        step "Installing into $t"
+        blank
+        bash "$REPO_DIR/ai/scripts/install-global.sh" "$t"
+    fi
+
+    blank
+    if _confirm "Also install the declared third-party skills?"; then
+        blank
+        bash "$REPO_DIR/ai/scripts/install-external-skills.sh"
+    fi
+
     blank
     echo -e "  ${W}What's next:${NC}"
-    info "claude-install-project   bootstrap .claude/ in a project"
-    info "claude-help              print all commands and slash command reference"
-    info "In Claude Code: /repo-profile   generate project-specific .claude/ content"
-    info "See ai/claude/USAGE.md for full workflows"
+    info "ai-install <target>       re-sync one agent from the kit"
+    info "ai-port <target>          render to a temp dir to inspect before installing"
+    info "ai-install-project <t>    bootstrap a project template in this directory"
+    info "See ai/README.md for how to add a new agent as a target"
+}
+
+install_extensions() {
+    blank
+    echo -e "  ${W}Editor Extensions${NC}"
+    sep
+    blank
+    echo -e "  Builds each extension declared in ${C}extensions/*/extension.json${NC}"
+    echo -e "  from source and installs the ${C}.vsix${NC}, then installs its agent config."
+    blank
+
+    local d name desc
+    for d in "$REPO_DIR"/extensions/*/; do
+        [[ -f "$d/extension.json" ]] || continue
+        name=$(basename "$d")
+        desc=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["displayName"])' "$d/extension.json")
+        info "$(printf '%-12s %s' "$name" "$desc")"
+    done
+    blank
+
+    if ! command -v git &>/dev/null; then
+        fail "git is required but not installed"; return 1
+    fi
+
+    step "Building and installing"
+    blank
+    bash "$REPO_DIR/extensions/install.sh"
+    blank
+    info "Reload the editor window to activate."
 }
 
 # ─── install all ─────────────────────────────────────────────────────────────
@@ -291,7 +387,8 @@ _install_all() {
     info "shell    bash aliases, starship prompt"
     info "hooks    git pre-commit & pre-push checks (globally)"
     info "browser  TamperMonkey scripts (requires .env)"
-    info "claude   global Claude Code configuration"
+    info "ai       agent config for Claude, Codex, Cursor & Metwally"
+    info "ext      editor extensions built from source"
     blank
 
     _confirm "Proceed with full installation?" || {
@@ -302,7 +399,8 @@ _install_all() {
     install_shell   || true; blank; sep; blank
     install_hooks   || true; blank; sep; blank
     install_browser || true; blank; sep; blank
-    install_claude  || true
+    install_ai      || true; blank; sep; blank
+    install_extensions || true
 
     blank
     echo -e "  ${B}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -328,13 +426,14 @@ cmd_status() {
     sep
     blank
 
-    local ss sh sb sc
-    ss=$(_s_shell); sh=$(_s_hooks); sb=$(_s_browser); sc=$(_s_claude)
+    local ss sh sb sc se
+    ss=$(_s_shell); sh=$(_s_hooks); sb=$(_s_browser); sc=$(_s_ai); se=$(_s_ext)
 
     printf "  %b  %-9s%b  %b%-38s%b  %s\n" "$W" "shell"   "$NC" "$D" "Bash aliases, prompt & shell manager"       "$NC" "$(_badge "$ss")"
     printf "  %b  %-9s%b  %b%-38s%b  %s\n" "$W" "hooks"   "$NC" "$D" "Git pre-commit & pre-push quality checks"   "$NC" "$(_badge "$sh")"
     printf "  %b  %-9s%b  %b%-38s%b  %s\n" "$W" "browser" "$NC" "$D" "TamperMonkey scripts for GitLab & ActiTIME" "$NC" "$(_badge "$sb")"
-    printf "  %b  %-9s%b  %b%-38s%b  %s\n" "$W" "claude"  "$NC" "$D" "Global Claude Code config & skills"         "$NC" "$(_badge "$sc")"
+    printf "  %b  %-9s%b  %b%-38s%b  %s\n" "$W" "ai"      "$NC" "$D" "Agent config across all AI targets"         "$NC" "$(_badge "$sc")"
+    printf "  %b  %-9s%b  %b%-38s%b  %s\n" "$W" "ext"     "$NC" "$D" "Editor extensions built from source"        "$NC" "$(_badge "$se")"
 
     blank
     sep
@@ -434,17 +533,62 @@ cmd_doctor() {
             || warn "${f}.js not generated  →  forge install browser"
     done
 
-    blank; echo -e "  ${D}claude${NC}"; blank
+    blank; echo -e "  ${D}ai${NC}"; blank
 
-    if [[ -f "$HOME/.claude/CLAUDE.md" ]]; then
-        ok "Global config at ~/.claude/"
-        local skills cmds agents
-        skills=$(ls "$HOME/.claude/skills/"   2>/dev/null | wc -l | tr -d ' ')
-        cmds=$(ls   "$HOME/.claude/commands/" 2>/dev/null | wc -l | tr -d ' ')
-        agents=$(ls "$HOME/.claude/agents/"   2>/dev/null | wc -l | tr -d ' ')
-        ok "${skills} skills  ·  ${cmds} commands  ·  ${agents} agents"
+    local t label home n_sk n_cm n_ag
+    # Count manifest entries under a target's own destination prefix.
+    # grep -c prints 0 and exits 1 when nothing matches, so the exit status is
+    # swallowed rather than appending a second count.
+    _mcount() { grep -c "^$2/" "$1" 2>/dev/null || true; }
+    while read -r t; do
+        [[ -n "$t" ]] || continue
+        label=$(sed -n 's/^TARGET_LABEL="\(.*\)"$/\1/p' "$REPO_DIR/ai/targets/$t.target")
+        home=$(bash -c 'set -a; . "'"$REPO_DIR"'/ai/targets/'"$t"'.target"; printf %s "$TARGET_HOME"')
+        if _ai_target_installed "$t"; then
+            # Destinations differ per target (Cursor keeps skills in rules/),
+            # so the prefixes come from the target file, not a fixed guess.
+            local mf sk_d cm_d ag_d
+            mf="$home/.engineering-productivity.manifest"
+            eval "$(bash -c 'set -a; . "'"$REPO_DIR"'/ai/targets/'"$t"'.target"
+                printf "sk_d=%q cm_d=%q ag_d=%q" \
+                    "${SKILLS_DEST#"$TARGET_HOME"/}" \
+                    "${COMMANDS_DEST#"$TARGET_HOME"/}" \
+                    "${AGENTS_DEST#"$TARGET_HOME"/}"')"
+            # Cursor stores the instructions rule in the skills directory;
+            # exclude it so the skill count means skills.
+            local ins_d
+            ins_d=$(bash -c 'set -a; . "'"$REPO_DIR"'/ai/targets/'"$t"'.target"
+                printf %s "${INSTRUCTIONS_DEST#"$TARGET_HOME"/}"')
+            if [ -n "$sk_d" ]; then
+                n_sk=$(grep "^$sk_d/" "$mf" 2>/dev/null | grep -vxF "$ins_d" | wc -l)
+            else
+                n_sk=0
+            fi
+            n_cm=$([ -n "$cm_d" ] && _mcount "$mf" "$cm_d" || echo 0)
+            n_ag=$([ -n "$ag_d" ] && _mcount "$mf" "$ag_d" || echo 0)
+            ok "$(printf '%-16s %s' "$label" "$home")"
+            ok "$(printf '%-16s %s skills · %s commands · %s agents' "" "$n_sk" "$n_cm" "$n_ag")"
+        else
+            warn "$(printf '%-16s not installed  →  forge install ai' "$label")"
+        fi
+    done < <(_ai_targets)
+
+    blank; echo -e "  ${D}extensions${NC}"; blank
+
+    local d name id
+    if ! ls "$REPO_DIR"/extensions/*/extension.json &>/dev/null; then
+        info "none declared"
     else
-        fail "Claude config not installed  →  forge install claude"; issues=$((issues+1))
+        for d in "$REPO_DIR"/extensions/*/; do
+            [[ -f "$d/extension.json" ]] || continue
+            name=$(basename "$d")
+            id=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["extensionId"])' "$d/extension.json" 2>/dev/null)
+            if ls -d "$HOME/.vscode/extensions/${id,,}"-* &>/dev/null; then
+                ok "$(printf '%-16s installed (%s)' "$name" "$id")"
+            else
+                warn "$(printf '%-16s not installed  →  forge install ext' "$name")"
+            fi
+        done
     fi
 
     blank; sep; blank
@@ -470,7 +614,8 @@ cmd_help() {
     printf "  %b%-28s%b %s\n" "$G" "forge install shell"    "$NC" "Install bash aliases & starship"
     printf "  %b%-28s%b %s\n" "$G" "forge install hooks"    "$NC" "Install git hooks"
     printf "  %b%-28s%b %s\n" "$G" "forge install browser"  "$NC" "Configure TamperMonkey scripts"
-    printf "  %b%-28s%b %s\n" "$G" "forge install claude"   "$NC" "Install Claude Code global config"
+    printf "  %b%-28s%b %s\n" "$G" "forge install ai"       "$NC" "Install agent config (choose target)"
+    printf "  %b%-28s%b %s\n" "$G" "forge install ext"      "$NC" "Build & install editor extensions"
     printf "  %b%-28s%b %s\n" "$G" "forge status"           "$NC" "Show installation status"
     printf "  %b%-28s%b %s\n" "$G" "forge doctor"           "$NC" "Check all dependencies"
     printf "  %b%-28s%b %s\n" "$G" "forge help"             "$NC" "Show this reference"
@@ -492,14 +637,24 @@ cmd_help() {
     blank
     printf "  %b%-28s%b %s\n" "$C" "hooks-install-global"   "$NC" "Re-sync ~/.git-hooks/ from repo"
     blank
-    echo -e "  ${W}Claude module${NC}"
+    echo -e "  ${W}AI module${NC}"
     sep
     blank
-    printf "  %b%-28s%b %s\n" "$C" "claude-install-global"  "$NC" "Re-sync ~/.claude/ from repo"
-    printf "  %b%-28s%b %s\n" "$C" "claude-install-project" "$NC" "Bootstrap .claude/ in a project"
-    printf "  %b%-28s%b %s\n" "$C" "claude-sync-project"    "$NC" "Sync template updates (non-destructive)"
-    printf "  %b%-28s%b %s\n" "$C" "claude-help"            "$NC" "Claude Code command reference"
-    printf "  %b%-28s%b %s\n" "$C" "cdclaudeconfig"         "$NC" "cd to ~/.claude/"
+    printf "  %b%-28s%b %s\n" "$C" "ai-install <target|all>" "$NC" "Install shared config into an agent"
+    printf "  %b%-28s%b %s\n" "$C" "ai-port <target>"        "$NC" "Render to a temp dir without installing"
+    printf "  %b%-28s%b %s\n" "$C" "ai-install-project <t>"  "$NC" "Bootstrap a project template here"
+    printf "  %b%-28s%b %s\n" "$C" "ai-external-skills"      "$NC" "Install declared third-party skills"
+    printf "  %b%-28s%b %s\n" "$C" "ai-targets"              "$NC" "List available agent targets"
+    printf "  %b%-28s%b %s\n" "$C" "claude-install-global"   "$NC" "Alias for: ai-install claude"
+    printf "  %b%-28s%b %s\n" "$C" "claude-install-project"  "$NC" "Bootstrap .claude/ in a project"
+    printf "  %b%-28s%b %s\n" "$C" "claude-help"             "$NC" "Claude Code command reference"
+    printf "  %b%-28s%b %s\n" "$C" "cdclaudeconfig"          "$NC" "cd to ~/.claude/"
+    blank
+    echo -e "  ${W}Extensions module${NC}"
+    sep
+    blank
+    printf "  %b%-28s%b %s\n" "$C" "ext-install [name]"      "$NC" "Build & install from extensions/"
+    printf "  %b%-28s%b %s\n" "$C" "ext-install --update"    "$NC" "Pull upstream, rebuild, reinstall"
     blank
     echo -e "  ${W}Benchmarks${NC}"
     sep
@@ -512,7 +667,7 @@ cmd_help() {
     blank
     info "Repo path override:  export ENGPROD_DIR=/path/to/this/repo"
     info ".env location:       $REPO_DIR/.env"
-    info "Claude global:       ~/.claude/"
+    info "AI targets:          $REPO_DIR/ai/targets/"
     info "Aliases target:      ~/.bashrc.d/"
     blank
 }
@@ -528,7 +683,8 @@ declare -a _ITEMS=(
     "m:shell:Bash aliases, prompt & shell manager:install_shell"
     "m:hooks:Git pre-commit & pre-push quality checks:install_hooks"
     "m:browser:TamperMonkey scripts for GitLab & ActiTIME:install_browser"
-    "m:claude:Global Claude Code config & skills:install_claude"
+    "m:ai:Agent config across all AI targets:install_ai"
+    "m:ext:Editor extensions built from source:install_extensions"
     "s:::"
     "a:Install all modules::_install_all"
     "a:Status::cmd_status"
@@ -570,7 +726,8 @@ _render() {
                 shell)   status="$ss" ;;
                 hooks)   status="$sh" ;;
                 browser) status="$sb" ;;
-                claude)  status="$sc" ;;
+                ai)      status="$sc" ;;
+                ext)     status="$se" ;;
                 *)       status="none" ;;
             esac
             local badge; badge=$(_badge "$status")
@@ -604,8 +761,8 @@ _render() {
 cmd_menu() {
     local idx=0
 
-    local ss sh sb sc
-    ss=$(_s_shell); sh=$(_s_hooks); sb=$(_s_browser); sc=$(_s_claude)
+    local ss sh sb sc se
+    ss=$(_s_shell); sh=$(_s_hooks); sb=$(_s_browser); sc=$(_s_ai); se=$(_s_ext)
 
     _cursor_hide
     trap '_cursor_show' EXIT INT TERM
@@ -658,11 +815,17 @@ case "${1:-}" in
             shell)   install_shell ;;
             hooks)   install_hooks ;;
             browser) install_browser ;;
-            claude)  install_claude ;;
+            ai)      install_ai ;;
+            ext|extensions) install_extensions ;;
+            # Retained: `forge install claude` now targets the claude adapter.
+            claude)  bash "$REPO_DIR/ai/scripts/install-global.sh" claude ;;
+            codex|cursor|metwally)
+                     bash "$REPO_DIR/ai/scripts/install-global.sh" "$2" ;;
             *)
                 fail "Unknown module: $2"
                 blank
-                info "Modules: shell  hooks  browser  claude"
+                info "Modules: shell  hooks  browser  ai  ext"
+                info "AI targets: $(_ai_targets | tr '\n' ' ')"
                 exit 1
                 ;;
         esac

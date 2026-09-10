@@ -16,7 +16,7 @@ and reusable workflows (debug, review, plan, caveman).
 Run from inside a project directory to scaffold `.cursor/rules/`:
 
 ```bash
-/path/to/engineering-productivity/ai/cursor/scripts/install-project.sh
+/path/to/engineering-productivity/ai/scripts/install-project.sh cursor
 ```
 
 Then fill in the project-specific map files:

@@ -1,0 +1,37 @@
+{
+  "name": "metwally",
+  "displayName": "Metwally Coding Agent",
+  "description": "VS Code front-end for the pi coding agent, built for self-hosted models (vLLM, Ollama, llama.cpp, LM Studio, LiteLLM).",
+  "publisher": "local",
+  "extensionId": "local.pi-vscode",
+  "source": {
+    "type": "git",
+    "url": "https://github.com/MostafaHakam98/metwally-vscode.git",
+    "ref": "default",
+    "note": "Tracks the repository default branch; set a branch, tag or commit here to pin."
+  },
+  "build": {
+    "requires": [
+      "node",
+      "npm"
+    ],
+    "steps": [
+      "npm ci --no-audit --no-fund || npm install --no-audit --no-fund",
+      "npm run compile",
+      "npm test",
+      "npx --yes @vscode/vsce package --allow-missing-repository --out metwally.vsix"
+    ],
+    "artifact": "metwally.vsix"
+  },
+  "runtime": {
+    "requires": [
+      "pi"
+    ],
+    "install": "npm install -g @earendil-works/pi-coding-agent",
+    "note": "The extension drives the `pi` binary over line-delimited JSON-RPC. It probes nvm, /usr/local/bin and ~/.local/bin, or set piVscode.piPath."
+  },
+  "aiTarget": "metwally",
+  "settings": {
+    "piVscode.trustProject": "Required for pi to load project-local .pi/ resources. Enable only for repositories you trust."
+  }
+}

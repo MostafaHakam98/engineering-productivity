@@ -5,7 +5,7 @@ A version-controlled toolkit for engineering workflow. Shell environment, Git ho
 ## Quick Start
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/MostafaHakam98/engineering-productivity
 cd engineering-productivity
 cp .env.example .env        # fill in your values
 ./forge install                # interactive installer
@@ -18,7 +18,8 @@ cp .env.example .env        # fill in your values
 | **shell** | Modular bash aliases, starship prompt, shell manager | `./forge install shell` |
 | **hooks** | Git pre-commit and pre-push quality checks | `./forge install hooks` |
 | **browser** | TamperMonkey scripts for GitLab and ActiTIME | `./forge install browser` |
-| **claude** | Global Claude Code config — skills, commands, agents | `./forge install claude` |
+| **ai** | Agent config for Claude, Codex, Cursor & Metwally from one source | `./forge install ai` |
+| **ext** | Editor extensions built from source, with their agent config | `./forge install ext` |
 
 ## Structure
 
@@ -46,12 +47,23 @@ engineering-productivity/
 ├── os/
 │   └── ubuntu/                 # Ubuntu / GNOME shortcuts
 │
+├── extensions/                 # Editor extensions, declared not vendored
+│   ├── install.sh              # Clone, build, install .vsix + agent config
+│   └── metwally/               # Metwally Coding Agent (pi front-end)
+│
 └── ai/
-    └── claude/
-        ├── global/             # Personal config — installs to ~/.claude/
-        ├── project-template/   # Starter .claude/ for any project
-        ├── benchmark/          # Claude Code skill benchmarks
-        └── scripts/            # install-global.sh, install-project.sh, sync-project.sh
+    ├── shared/                 # ONE source of truth, tool-neutral
+    │   ├── instructions.md     #   global behavior & style rules
+    │   ├── skills/             #   SKILL.md dirs (+ references/, scripts/)
+    │   ├── commands/           #   slash commands / prompt templates
+    │   ├── agents/             #   subagent definitions
+    │   ├── permissions.json    #   tool allow/deny rules
+    │   ├── external-skills.json#   third-party skills, pinned & fetched
+    │   └── project-template/   #   per-repository rules, maps, workflows
+    ├── targets/                # One .target file per agent — add one, get an agent
+    ├── scripts/                # port.sh, install-global.sh, install-project.sh
+    ├── claude/                 # Claude-specific: benchmarks + shims
+    └── cursor/                 # Cursor-specific: shims
 ```
 
 ## The forge CLI
@@ -73,10 +85,13 @@ al status               Show load order and installed files
 al doctor               Diagnose shell environment issues
 al starship install     Install starship prompt config
 
-claude-install-global   Re-sync ~/.claude/ with latest global config
-claude-install-project  Bootstrap .claude/ in a project directory
-claude-sync-project     Pull template updates into an existing project
-claude-help             Print all Claude commands and slash command reference
+ai-install <target|all> Render the shared config into an agent and install it
+ai-port <target>        Render only, to a temp dir, to inspect before installing
+ai-install-project <t>  Bootstrap a project template in the current directory
+ai-external-skills      Fetch the declared third-party skills
+ai-targets              List available agent targets
+ext-install [name]      Build & install editor extensions from source
+ai-help                 Print all AI commands, skills and slash commands
 ```
 
 ## Configuration
@@ -97,8 +112,12 @@ cp .env.example .env
 - [shell/aliases/README.md](shell/aliases/README.md) — alias categories, load order, install methods
 - [git/hooks/README.md](git/hooks/README.md) — hook behavior and bypass instructions
 - [browser/scripts/README.md](browser/scripts/README.md) — script setup and TamperMonkey install
-- [ai/claude/README.md](ai/claude/README.md) — Claude Code kit structure
+- [ai/README.md](ai/README.md) — the AI kit: one source, many agents, and how to add one
+- [ai/claude/README.md](ai/claude/README.md) — Claude Code target
 - [ai/claude/USAGE.md](ai/claude/USAGE.md) — day-to-day Claude Code workflows
+- [ai/cursor/README.md](ai/cursor/README.md) — Cursor target
+- [extensions/README.md](extensions/README.md) — editor extensions
+- [extensions/metwally/README.md](extensions/metwally/README.md) — Metwally Coding Agent
 
 ## Philosophy
 
