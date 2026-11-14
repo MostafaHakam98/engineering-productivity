@@ -1,166 +1,50 @@
-# TamperMonkey Scripts
+# Tampermonkey scripts
 
-Browser automation scripts for common engineering workflows. These scripts enhance productivity by automating repetitive tasks and adding keyboard shortcuts to web applications.
+Generate userscripts locally from templates, review them, then install them
+manually in Tampermonkey.
 
-## What's Included
+| Script | Behavior |
+|---|---|
+| GitLab File Tree | Read-only repository tree, quick search, copy path, encoded navigation URLs |
+| GitLab Issue → MR | Prepare a project-scoped description template and suggested branch; apply/copy on request |
+| ActiTIME | Explicitly configured hour-grid autofill, confirmation before writes, summaries and CSV export |
 
-### `GitLab-File-Tree.js`
-Enhanced GitLab file tree sidebar with:
-- **Keyboard shortcuts** for navigation
-- **Quick search** functionality
-- **File counts** and statistics
-- **Copy path** functionality
-- **Dark theme** styling
-- **File type icons**
+## Setup
 
-**Compatible with**: GitLab instances (configure via `.env`)
+From the repository root:
 
-### `GitLab-Issue-MR.js`
-GitLab Issue → Merge Request helper:
-- **Branch name suggestions** from issue titles
-- **Label pre-filling**
-- **Clipboard copy** functionality
-- **Keyboard shortcuts**
-- **Markdown template generation**
-
-**Compatible with**: GitLab instances (configure via `.env`)
-
-### `ActiTime-AutoFill.js`
-ActiTIME time tracking automation:
-- **Auto-fill hours** for Sun–Thu (configurable)
-- **Progress indicators**
-- **Export functionality**
-- **Undo/redo** support
-- **Keyboard shortcuts** (Ctrl+Alt+F to fill)
-- **Metrics and statistics**
-
-**Compatible with**: `online.actitime.com`
-
-## Installation
-
-### Prerequisites
-
-1. Install [Tampermonkey](https://www.tampermonkey.net/) browser extension:
-   - [Chrome/Edge](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
-   - [Firefox](https://addons.mozilla.org/en-US/firefox/addon/tampermonkey/)
-   - [Safari](https://apps.apple.com/us/app/tampermonkey/id1482490089)
-
-### Automated Setup (Recommended)
-
-1. **Configure Environment Variables**
-   ```bash
-   # Copy the example environment file
-   cp .env.example .env
-   
-   # Edit .env with your values
-   # GITLAB_URL=gitlab.yourcompany.com
-   # COMPANY_NAME=YourCompany
-   # AUTHOR_NAME=Your Name
-   # STORAGE_KEY_PREFIX=yc
-   ```
-
-2. **Run Setup Script**
-   ```bash
-   cd TamperMonkey
-   ./setup.sh
-   ```
-   
-   This will generate configured scripts from templates, replacing placeholders with your values.
-
-3. **Install in Tampermonkey**
-   - Open Tampermonkey Dashboard
-   - For each generated `.js` file:
-     - Click "Create a new script"
-     - Copy the entire contents of the configured script
-     - Paste into the editor
-     - Save (Ctrl+S or Cmd+S)
-
-### Manual Setup (Alternative)
-
-If you prefer to configure manually:
-
-1. **Edit Template Files**
-   - Open `.template` files in the `TamperMonkey/` directory
-   - Replace placeholders:
-     - `{{GITLAB_URL}}` → Your GitLab instance URL
-     - `{{COMPANY_NAME}}` → Your company name
-     - `{{AUTHOR_NAME}}` → Your name
-     - `{{STORAGE_KEY_PREFIX}}` → Short prefix for localStorage keys (2-3 lowercase letters)
-
-2. **Save as `.js` files** and install in Tampermonkey as described above
-
-## Configuration
-
-### Environment Variables
-
-All configuration is done through the `.env` file:
-
-- **GITLAB_URL**: Your GitLab instance URL (without `https://`)
-  - Example: `gitlab.yourcompany.com`
-  
-- **COMPANY_NAME**: Your company name (used in script names)
-  - Example: `YourCompany`
-  
-- **AUTHOR_NAME**: Your name (used in `@author` field)
-  - Example: `John Doe`
-  
-- **STORAGE_KEY_PREFIX**: Short prefix for localStorage keys (2-3 lowercase letters)
-  - Example: `yc` for "YourCompany"
-  - Used to avoid conflicts with other scripts
-
-### ActiTime Script Configuration
-
-After setup, you can still customize the ActiTime script's work schedule by editing the script in Tampermonkey:
-
-```javascript
-const HOURS_BY_DAY = {
-    0: '8',   // Sunday
-    1: '8',   // Monday
-    // ... adjust to your work schedule
-};
+```bash
+cp .env.example .env
+# Edit GITLAB_URL, COMPANY_NAME, AUTHOR_NAME, STORAGE_KEY_PREFIX.
+bash browser/scripts/setup.sh
 ```
 
-## Usage
+The `.env` parser accepts plain or fully quoted `KEY=value` lines and full-line
+comments. It never sources the file, expands variables, or executes commands.
+Existing generated scripts receive `.ep-backup-*` backups before replacement.
+For isolated generation:
 
-### GitLab File Tree
-- Navigate GitLab repositories with enhanced sidebar
-- Use keyboard shortcuts for faster navigation
-- Search files quickly within the tree
+```bash
+bash browser/scripts/setup.sh --env /path/to/test.env --out /tmp/my-userscripts
+```
 
-### GitLab Issue → MR
-- Open an issue page
-- Click "Create MR" button (added by script)
-- Branch name and labels are auto-suggested
-- Use keyboard shortcuts for quick actions
+Open Tampermonkey's dashboard, create a new script for each generated `.js` file,
+paste its contents, and save. Regeneration does not update Tampermonkey's installed
+copy. Keep `.env` and generated scripts out of shared archives and commits.
 
-### ActiTime AutoFill
-- Navigate to your time tracking page
-- Press `Ctrl+Alt+F` (or `Cmd+Option+F` on Mac) to auto-fill hours
-- View metrics and export data using the script's UI
+## ActiTIME opt-in
 
-## Troubleshooting
+Grid operations are disabled until `TIMESHEET_INPUT_SELECTOR` and
+`FIRST_COLUMN_WEEKDAY` are configured in the installed userscript. Match only
+editable hour inputs with exactly seven visible columns per row. Review and
+customize the default Sun–Thu schedule. See the
+[configuration example and recovery guide](../../docs/INSTALLATION.md).
 
-1. **Scripts not running?**
-   - Check Tampermonkey is enabled
-   - Verify `@match` URLs match the pages you're visiting
-   - Check browser console for errors (F12)
+Fill and clear actions ask for confirmation. The site may save input changes
+automatically. Export first; there is no undo/redo feature. No Enter key is
+synthesized and no nearest-element click is used for previous-week navigation.
 
-2. **Need to update scripts?**
-   - Open Tampermonkey dashboard
-   - Edit the script
-   - Save changes
-
-3. **Conflicts with other extensions?**
-   - Disable conflicting extensions temporarily
-   - Check Tampermonkey's script execution order
-
-## Tips
-
-- **Keep scripts updated**: Check for updates regularly
-- **Test in development**: Use Tampermonkey's test mode before deploying
-- **Backup configurations**: Export scripts from Tampermonkey dashboard
-- **Customize for your workflow**: Modify scripts to match your specific needs
-
-## Security Note
-
-⚠️ These scripts have access to web page content. Review the code before installing, especially if obtained from untrusted sources.
+GitLab's label widgets differ between releases, so select MR labels manually.
+The helper fills a description; it does not submit an MR. Browser fixture tests
+check these scenarios without contacting live services. Live instance versions,
+permissions, and page markup still require recipient-side validation.

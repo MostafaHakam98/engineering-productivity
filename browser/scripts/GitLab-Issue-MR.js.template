@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitLab Issue → MR Helper (markdown + username, no duplicates)
 // @namespace    https://{{GITLAB_URL}}/
-// @version      2.0.0
+// @version      2.1.0
 // @description  Enhanced GitLab Issue→MR helper with branch suggestions, label pre-fill, clipboard copy, and keyboard shortcuts.
 // @match        https://{{GITLAB_URL}}/*/*/-/issues/*
 // @match        https://{{GITLAB_URL}}/*/*/-/merge_requests/new*
@@ -132,7 +132,7 @@
     }
 
     function saveTemplate(data) {
-        const payload = { ...data, createdAt: Date.now() };
+        const payload = { ...data, projectPath: location.pathname.split('/-/')[0], createdAt: Date.now() };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     }
 
@@ -145,6 +145,9 @@
                 localStorage.removeItem(STORAGE_KEY);
                 return null;
             }
+            if (data.projectPath !== location.pathname.split('/-/')[0] ||
+                !/^\d+$/.test(String(data.issueNumber)) ||
+                typeof data.body !== 'string' || typeof data.title !== 'string') return null;
             return data;
         } catch (e) {
             console.error('Invalid template JSON', e);
@@ -325,12 +328,8 @@
         const body = data.body || '';
 
         // If it already starts with our header, don't touch it
-        const headerRegex = new RegExp(
-            '^Issue\\s+Closes\\s+#' + data.issueNumber + '\\b',
-            'm'
-        );
-        if (headerRegex.test(currentDesc)) {
-            return currentDesc; // already applied
+        if (currentDesc.includes(`### Issue\nCloses #${data.issueNumber}\n`)) {
+            return currentDesc;
         }
 
         if (!currentDesc || !currentDesc.trim()) {
@@ -396,9 +395,16 @@
         const branchSuggestion = document.createElement('div');
         branchSuggestion.className = '{{STORAGE_KEY_PREFIX}}-branch-suggestion';
         const suggestedBranch = suggestBranchName(data.issueNumber, data.title);
-        branchSuggestion.innerHTML = `Suggested branch: <code>${suggestedBranch}</code> <button class="btn btn-sm btn-default {{STORAGE_KEY_PREFIX}}-copy-btn" data-branch="${suggestedBranch}">Copy</button>`;
+        branchSuggestion.append('Suggested branch: ');
+        const branchCode = document.createElement('code');
+        branchCode.textContent = suggestedBranch;
+        const copyBranchBtn = document.createElement('button');
+        copyBranchBtn.type = 'button';
+        copyBranchBtn.className = 'btn btn-sm btn-default {{STORAGE_KEY_PREFIX}}-copy-btn';
+        copyBranchBtn.dataset.branch = suggestedBranch;
+        copyBranchBtn.textContent = 'Copy';
+        branchSuggestion.append(branchCode, ' ', copyBranchBtn);
 
-        const copyBranchBtn = branchSuggestion.querySelector('[data-branch]');
         if (copyBranchBtn) {
             copyBranchBtn.addEventListener('click', async () => {
                 const branch = copyBranchBtn.getAttribute('data-branch');
@@ -456,23 +462,8 @@
                 titleInput.value = data.title;
             }
 
-            // Pre-fill labels if available
-            if (data.labels && data.labels.length > 0) {
-                try {
-                    const labelInput = document.querySelector('#merge_request_label_ids, input[name*="label"], .labels-input input');
-                    if (labelInput) {
-                        // Try to trigger label selection (GitLab's label system varies)
-                        data.labels.forEach(label => {
-                            const labelOption = document.querySelector(`[data-label-name="${label}"], [title="${label}"]`);
-                            if (labelOption) {
-                                labelOption.click();
-                            }
-                        });
-                    }
-                } catch (e) {
-                    console.warn('Could not pre-fill labels', e);
-                }
-            }
+            descTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+            // GitLab label widgets vary; leave label selection to the user.
 
             showToast('Issue template applied to MR description.');
             clearTemplate();

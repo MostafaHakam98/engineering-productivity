@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitLab File Tree Sidebar
 // @namespace    https://{{GITLAB_URL}}/
-// @version      2.0.0
+// @version      2.1.0
 // @description  Enhanced GitLab file tree sidebar with keyboard shortcuts, quick search, file counts, copy path, and more. Dark grey themed with icons for various file types.
 // @match        https://{{GITLAB_URL}}/*/-/blob/*
 // @match        https://{{GITLAB_URL}}/*/-/tree/*
@@ -29,6 +29,11 @@
 
 (function () {
     'use strict';
+
+    // Escape repository-controlled names before using an HTML template.
+    const escapeHtml = (value) => String(value).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[c]);
 
     // ---------- Utilities ----------
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -117,7 +122,7 @@
                 }
             }
 
-            branch = detectedBranch || 'master'; // Default fallback
+            branch = detectedBranch || ''; // Default fallback
         }
 
         return {
@@ -151,11 +156,7 @@
 
         // Try alternative branch names if the requested branch fails (e.g., master/main confusion)
         const branchAttempts = [branch];
-        if (branch === 'master') {
-            branchAttempts.push('main');
-        } else if (branch === 'main') {
-            branchAttempts.push('master');
-        }
+        // An explicit branch must never silently display another branch.
 
         let lastError = null;
         for (const attemptBranch of branchAttempts) {
@@ -365,9 +366,9 @@
         function makeUrl(type, path) {
             // Navigate to blob/tree preserving branch
             if (type === 'tree') {
-                return `${host}/${projectPath}/-/tree/${encodeURIComponent(branch)}/${path}`;
+                return `${host}/${projectPath}/-/tree/${encodeURIComponent(branch)}/${path.split('/').map(encodeURIComponent).join('/')}`;
             }
-            return `${host}/${projectPath}/-/blob/${encodeURIComponent(branch)}/${path}`;
+            return `${host}/${projectPath}/-/blob/${encodeURIComponent(branch)}/${path.split('/').map(encodeURIComponent).join('/')}`;
         }
 
         function createNodeEl(node, depth = 0) {
@@ -390,8 +391,8 @@
             row.innerHTML = `
           <span class="gl-filetree__twisty" ${isDir ? '' : 'style="visibility:hidden"'}>▸</span>
           <span class="gl-filetree__icon">${fileIcon}</span>
-          <a class="gl-filetree__name" href="${makeUrl(node.type, node.path)}">${node.name}${fileCountText}</a>
-          <button class="gl-filetree__copy" data-path="${node.path}" title="Copy file path">📋</button>
+          <a class="gl-filetree__name" href="${escapeHtml(makeUrl(node.type, node.path))}">${escapeHtml(node.name)}${fileCountText}</a>
+          <button class="gl-filetree__copy" data-path="${escapeHtml(node.path)}" title="Copy file path">📋</button>
         `;
 
             // Copy path button
@@ -598,7 +599,7 @@
                 matches.forEach(file => {
                     const li = document.createElement('li');
                     li.className = 'gl-filetree__quicksearch-item';
-                    li.innerHTML = `<span class="gl-filetree__quicksearch-name">${file.name}</span><span class="gl-filetree__quicksearch-path">${file.path}</span>`;
+                    li.innerHTML = `<span class="gl-filetree__quicksearch-name">${escapeHtml(file.name)}</span><span class="gl-filetree__quicksearch-path">${escapeHtml(file.path)}</span>`;
                     li.addEventListener('click', () => {
                         window.location.href = makeUrl('blob', file.path);
                     });
@@ -674,13 +675,13 @@
     async function init() {
         const ctx = parseGitLabUrl();
         if (!ctx) return; // Not a project page
-        if (!ctx.branch || ctx.branch === 'master') {
+        if (!ctx.branch) {
             // Wait a bit for page to load branch info, then retry
             await sleep(500);
             const retryCtx = parseGitLabUrl();
-            if (retryCtx && retryCtx.branch && retryCtx.branch !== 'master') {
+            if (retryCtx && retryCtx.branch) {
                 Object.assign(ctx, retryCtx);
-            } else if (!ctx.branch || ctx.branch === 'master') {
+            } else if (!ctx.branch) {
                 // Try to get default branch from API
                 try {
                     const defaultBranch = await getDefaultBranch(ctx);
@@ -693,8 +694,10 @@
         if (document.body.dataset.glFiletreeReady === '1') return;
         document.body.dataset.glFiletreeReady = '1';
 
+        const requestedRoute = location.pathname;
         try {
             const items = await fetchRepoTree(ctx);
+            if (location.pathname !== requestedRoute) return;
             const tree = buildTree(items);
             const currentPath = (ctx.repoAction === 'blob' || ctx.repoAction === 'edit') ? ctx.subpath : '';
             const sidebar = renderTree(tree, {

@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ActiTIME Autofill & Metrics ({{COMPANY_NAME}})
 // @namespace    http://tampermonkey.net/
-// @version      2.0.0
-// @description  Enhanced ActiTIME autofill with progress indicators, export, undo/redo, and more keyboard shortcuts.
+// @version      2.1.0
+// @description  Enhanced ActiTIME autofill with progress indicators, export, confirmation before changes, and keyboard shortcuts.
 // @author       {{AUTHOR_NAME}}
 // @match        https://online.actitime.com/*
 // @run-at       document-idle
@@ -18,7 +18,13 @@
      * CONFIG
      ********************************************/
 
-    // You work Sun–Thu:
+    // Required opt-in: inspect your site's grid, set a selector matching ONLY
+    // timesheet hour inputs, and set its first column (0=Sun, 1=Mon, ...).
+    // Leaving these unset disables grid reads/writes instead of guessing.
+    const TIMESHEET_INPUT_SELECTOR = '';
+    const FIRST_COLUMN_WEEKDAY = null;
+
+    // Default schedule: Sun–Thu; customize before enabling writes.
     // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
     const HOURS_BY_DAY = {
         0: '8',   // Sunday
@@ -244,7 +250,7 @@
 
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.dispatchEvent(new Event('change', { bubbles: true }));
-        fireEnterKey(input);
+        // Never synthesize Enter: it can submit the surrounding form.
         input.dispatchEvent(new Event('blur', { bubbles: true }));
 
         const cell = input.closest('td') || input;
@@ -275,9 +281,12 @@
     }
 
     function getTimesheetMatrix() {
+        if (!TIMESHEET_INPUT_SELECTOR || !Number.isInteger(FIRST_COLUMN_WEEKDAY) ||
+            FIRST_COLUMN_WEEKDAY < 0 || FIRST_COLUMN_WEEKDAY > 6) return [];
         const allInputs = Array.from(
-            document.querySelectorAll('input[type="text"], input[type="number"]')
-        ).filter(input => input.offsetParent !== null);
+            document.querySelectorAll(TIMESHEET_INPUT_SELECTOR)
+        ).filter(input => input instanceof HTMLInputElement && input.offsetParent !== null &&
+            !input.disabled && !input.readOnly && ['text', 'number'].includes(input.type));
 
         if (!allInputs.length) {
             console.log('[TM ActiTIME] No visible text/number inputs found at all.');
@@ -303,9 +312,12 @@
         const matrix = rows
             .map(row => {
                 row.cells.sort((a, b) => a.left - b.left);
-                return row.cells.map(c => c.el);
+                if (row.cells.length !== 7) return null;
+                const byDay = Array(7);
+                row.cells.forEach((cell, col) => { byDay[(col + FIRST_COLUMN_WEEKDAY) % 7] = cell.el; });
+                return byDay;
             })
-            .filter(row => row.length >= 5);
+            .filter(Boolean);
 
         console.log(
             '[TM ActiTIME] Detected rows:',
@@ -389,6 +401,7 @@
             return;
         }
 
+        if (!confirm('Replace ALL configured Sun–Thu hours for this week? The site may save changes automatically. Export a copy first.')) return;
         let filled = 0;
         WEEKDAY_INDICES.forEach(idx => {
             filled += fillDayForIndex(idx);
@@ -413,6 +426,7 @@
             return;
         }
 
+        if (!confirm('Replace today’s configured hours? The site may save changes automatically.')) return;
         const filled = fillDayForIndex(todayIdx);
         const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         alert(`ActiTIME Autofill: Filled ${filled} cells for today (${dayNames[todayIdx]}) to reach total 8h.`);
@@ -430,6 +444,7 @@
             return;
         }
 
+        if (!confirm('Clear ALL detected hours for this week, including weekends? The site may save changes automatically.')) return;
         let cleared = 0;
         matrix.forEach(rowCells => {
             rowCells.forEach(input => {
@@ -550,7 +565,8 @@
         const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         const weekLabel = getWeekLabel() || 'Current Week';
 
-        let csv = `Week: ${weekLabel}\n\n`;
+        const safeWeek = '"' + String(weekLabel).replace(/"/g, '""').replace(/^[=+@-]/, "'$&") + '"';
+        let csv = `Week:,${safeWeek}\n\n`;
         csv += 'Task,';
         dayNames.forEach((name, idx) => {
             if (WEEKDAY_INDICES.includes(idx)) {
@@ -640,46 +656,7 @@
     }
 
     function clickPrevWeek() {
-        // 1) Heuristic based on week label position
-        const labelEl = getWeekLabelElement();
-        if (labelEl) {
-            const labelRect = labelEl.getBoundingClientRect();
-            const container =
-                labelEl.closest('table') ||
-                labelEl.closest('div') ||
-                labelEl.parentElement ||
-                document.body;
-
-            const candidates = Array.from(
-                container.querySelectorAll('a, button, span, img')
-            ).filter(el => el.offsetParent !== null);
-
-            // Look for clickable element on the LEFT side of the label, same vertical band
-            let best = null;
-            let bestRight = -Infinity;
-
-            candidates.forEach(el => {
-                const r = el.getBoundingClientRect();
-                const verticallyAligned =
-                    r.bottom > labelRect.top - 5 && r.top < labelRect.bottom + 5;
-                const leftSide = r.right <= labelRect.left;
-
-                if (!verticallyAligned || !leftSide) return;
-
-                // Prefer the one closest to the label (max right)
-                if (r.right > bestRight) {
-                    bestRight = r.right;
-                    best = el;
-                }
-            });
-
-            if (best) {
-                console.log('[TM ActiTIME] Prev-week button chosen near week label:', best);
-                best.click();
-                return true;
-            }
-        }
-
+        // Use explicit previous-week controls; never click the nearest element.
         // 2) Fallback: selector-based guessing
         const selectors = [
             'a[href*="changeWeek=-1"]',
