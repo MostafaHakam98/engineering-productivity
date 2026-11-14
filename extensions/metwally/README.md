@@ -16,7 +16,8 @@ This clones the extension, builds a `.vsix`, installs it, and then installs the
 `metwally` AI target so `pi` starts with this kit's instructions, skills and
 prompt templates already in place.
 
-Prerequisites: `node`, `npm`, and the `pi` binary.
+Prerequisites: Node.js 22+, npm, the `pi` binary, and an editor CLI.
+Use `ext-install metwally --build-only` to build/test/package without an editor or runtime.
 
 ```bash
 npm install -g @earendil-works/pi-coding-agent
@@ -61,5 +62,6 @@ directory) and the rules, maps and workflows under `.pi/`.
 ext-install metwally --update
 ```
 
-Pulls upstream, rebuilds, reinstalls, and re-syncs the agent config. Reload the
+Refetches the pinned commit, rebuilds, reinstalls, and re-syncs the agent config.
+It does not advance the pin; edit `extension.json` after reviewing a new revision. Reload the
 editor window afterwards.

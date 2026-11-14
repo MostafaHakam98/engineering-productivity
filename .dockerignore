@@ -1,0 +1,14 @@
+.git
+.env
+.claude
+.idea
+.tmp
+**/__pycache__
+**/*.pyc
+**/*.ep-backup-*
+**/.engineering-productivity*.manifest
+**/.engineering-productivity*.state.json
+browser/scripts/*.js
+browser/scripts/*.bak
+ai/claude/benchmark/results
+**/node_modules

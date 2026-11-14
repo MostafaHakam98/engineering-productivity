@@ -7,9 +7,24 @@ A version-controlled toolkit for engineering workflow. Shell environment, Git ho
 ```bash
 git clone https://github.com/MostafaHakam98/engineering-productivity
 cd engineering-productivity
-cp .env.example .env        # fill in your values
-./forge install                # interactive installer
+./forge version
+bash shell/aliases/setup.sh copy  # start with one module
+# Open a new Bash terminal; use ./forge install for the guided full installer.
+# Browser scripts need their own .env setup; see docs/INSTALLATION.md.
 ```
+
+## Release and supported systems
+
+Current development version: **1.1.0** (unreleased). See [CHANGELOG.md](CHANGELOG.md)
+for features, fixes, history, and upgrade changes. The supported executable
+baseline is Linux with Bash 4+, Python 3.10+, and Git 2.31+; installer coverage
+is Ubuntu 22.04/24.04 on x86-64. Other platforms and live integrations require
+separate validation.
+
+Read [installation and recovery](docs/INSTALLATION.md) before sharing or installing,
+and [validation evidence and limits](docs/VALIDATION.md) for what was actually
+tested. Existing configurations receive recovery backups. Claude permissions
+require explicit opt-in, and ActiTIME grid writes require explicit configuration.
 
 ## Modules
 
@@ -96,7 +111,7 @@ ai-help                 Print all AI commands, skills and slash commands
 
 ## Configuration
 
-Browser scripts and some tools read from `.env` at the repo root:
+The browser script generator reads `.env` at the repo root as data:
 
 ```bash
 cp .env.example .env

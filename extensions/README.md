@@ -26,7 +26,8 @@ config so the extension arrives configured rather than empty.
 ```bash
 ext-install                  # every declared extension
 ext-install metwally         # just one
-ext-install --update         # pull upstream, rebuild, reinstall
+ext-install --update         # refetch the pinned revision, rebuild, reinstall
+ext-install --build-only     # compile, test, and package; no editor or runtime required
 ext-install --no-ai-config   # build and install the .vsix only
 ext-install --editor codium  # target a different editor CLI
 ```
@@ -40,7 +41,10 @@ forge doctor                 # shows which extensions are installed
 
 The installer picks the first available editor CLI from `code`,
 `code-insiders`, `codium`, `cursor`. Missing build or runtime prerequisites are
-reported and that extension is skipped — nothing is installed behind your back.
+reported as an installation failure. Normal installation requires an editor
+and runtime; `--build-only` checks build prerequisites only. Source refs must be
+40-character commit pins. Upstream build steps run trusted code with your user
+permissions; test them in a disposable container first.
 
 ## Adding an extension
 
@@ -54,7 +58,7 @@ Create `extensions/<name>/extension.json`:
   "publisher": "you",
   "extensionId": "you.example",
 
-  "source": { "type": "git", "url": "https://github.com/you/example.git", "ref": "main" },
+  "source": { "type": "git", "url": "https://github.com/you/example.git", "ref": "<40-character-reviewed-commit-sha>" },
 
   "build": {
     "requires": ["node", "npm"],

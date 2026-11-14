@@ -9,3 +9,11 @@ browser/scripts/*.bak
 
 # Benchmark run outputs (ephemeral — not useful as committed artifacts)
 ai/claude/benchmark/results/
+
+# Local installer state, recovery backups, and test output
+**/.engineering-productivity*.manifest
+**/.engineering-productivity*.state.json
+*.ep-backup-*
+__pycache__/
+*.pyc
+.tmp/
