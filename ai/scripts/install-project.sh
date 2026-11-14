@@ -27,8 +27,15 @@ TARGETS_DIR="$AI_DIR/targets"
 }
 
 TARGET="$1"; shift
+[[ "$TARGET" =~ ^[a-z][a-z0-9-]*$ ]] || { echo "invalid target: $TARGET" >&2; exit 1; }
 FORCE=0
-[ "${1:-}" = "--force" ] && FORCE=1
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --force) FORCE=1; shift ;;
+        *) echo "unknown option: $1" >&2; exit 1 ;;
+    esac
+done
+command -v python3 >/dev/null || { echo "python3 is required" >&2; exit 1; }
 
 TARGET_FILE="$TARGETS_DIR/$TARGET.target"
 [ -f "$TARGET_FILE" ] || { echo "unknown target: $TARGET" >&2; exit 1; }
@@ -50,14 +57,17 @@ esac
 
 if [ "$FORCE" = 0 ]; then
     for path in "${GUARDED[@]}"; do
-        [ -e "$path" ] || continue
+        [ -e "$path" ] || [ -L "$path" ] || continue
         echo "Already exists: $path"
         echo "Refusing to overwrite. Merge manually, or re-run with --force."
         exit 1
     done
 fi
 
-render_project "$SHARED_DIR/project-template" "$DEST" "$PROJECT_FORMAT" "$SKILLS_DEST"
+STAGE="$(mktemp -d "${TMPDIR:-/tmp}/ai-project.XXXXXX")"
+trap 'rm -rf "$STAGE"' EXIT
+render_project "$SHARED_DIR/project-template" "$STAGE/$PROJECT_DEST" "$PROJECT_FORMAT" "$SKILLS_DEST"
+python3 "$AI_DIR/../scripts/lib/install_files.py" "$STAGE" "$PWD" --prefix ".engineering-productivity-$TARGET-project"
 
 echo "Installed $TARGET_LABEL project template to: $DEST"
 echo "Next: fill in the project-specific sections — repo rules, repo map,"

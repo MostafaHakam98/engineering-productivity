@@ -87,10 +87,13 @@ render_instructions() {
 
 # subst [< stdin] -> stdout with every placeholder filled
 subst() {
-    sed -e "s#{{SKILLS_DIR}}#${PH_SKILLS_DIR:-}#g" \
-        -e "s#{{CONFIG_DIR}}#${PH_CONFIG_DIR:-}#g" \
-        -e "s#{{ENTRYPOINT}}#${PH_ENTRYPOINT:-}#g" \
-        -e "s#{{RULE_EXT}}#${PH_RULE_EXT:-md}#g"
+    python3 -c '
+import os, sys
+text = sys.stdin.read()
+for key in ("SKILLS_DIR", "CONFIG_DIR", "ENTRYPOINT", "RULE_EXT"):
+    text = text.replace("{{" + key + "}}", os.environ.get("PH_" + key, "md" if key == "RULE_EXT" else ""))
+sys.stdout.write(text)
+'
 }
 
 # subst_tree <dir> — rewrite placeholders in every text file under <dir>,
@@ -142,7 +145,7 @@ render_skills() {
                         printf '\n## Bundled Resources\n\n'
                         printf 'Not inlined into this rule. Read them from the kit when needed:\n\n'
                         while IFS= read -r rel; do
-                            printf -- '- `ai/shared/skills/%s/%s`\n' "$name" "$rel"
+                            printf -- '- `%s/%s/%s`\n' "$src" "$name" "$rel"
                         done <<< "$extras"
                     fi
                 } > "$dest/$name.mdc"
@@ -198,13 +201,12 @@ render_agents() {
                 {
                     printf 'name = "%s"\n' "$name"
                     printf 'description = "%s"\n' "${desc//\"/\\\"}"
-                    # TOML trims the newline right after the opening delimiter.
-                    # The body is emitted via %s so its trailing newline is
-                    # dropped and the value carries no trailing blank line.
-                    # Any literal triple-quote is escaped so the block cannot
-                    # break out of the string.
-                    printf 'developer_instructions = """\n%s"""\n' \
-                        "$(fm_strip "$f" | subst | sed 's|"""|\\"\\"\\"|g')"
+                    # JSON string escaping is valid TOML basic-string escaping;
+                    # preserve shell backslashes and multiline instructions.
+                    fm_strip "$f" | subst | python3 -c '
+import json, sys
+print("developer_instructions = " + json.dumps(sys.stdin.read(), ensure_ascii=False))
+'
                 } > "$dest/$(basename "$f" .md).toml"
             done
             ;;

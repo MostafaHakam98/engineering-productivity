@@ -1,84 +1,39 @@
-# Git Hooks
+# Git hooks
 
-Pre-commit and pre-push hooks that enforce code quality and prevent common mistakes.
+Small staged-content and Python syntax checks, installed per repository by
+preference. These heuristics supplement your project's own checks.
 
-## What's Included
+## Behavior
 
-### `pre-commit`
-Blocks commits that contain:
-- **TODO/FIXME comments** in staged changes
-- **Debug print statements** (Python)
-- **Potential secrets** (private keys, API keys, tokens)
-
-### `pre-push`
-Runs before pushing to remote:
-- **Python syntax check** (if Python files exist)
-- **Django smoke tests** (if `manage.py` exists)
+- `pre-commit` blocks private-key headers and AWS access-key patterns in staged
+  additions. It warns about TODO/FIXME markers; `ENGPROD_STRICT_HOOKS=1` makes
+  those blocking. Ordinary Python `print()` calls are permitted. This is not a
+  comprehensive secret scanner.
+- `pre-push` parses tracked, present Python files with Python 3 without importing
+  or executing them, writing bytecode, or running Django tests. Missing Python
+  is reported as a skipped check.
 
 ## Installation
 
-### Quick Setup
-
-Run the setup script to install hooks in your repository:
-
 ```bash
-cd /path/to/your/repo
-./path/to/engineering-productivity/GitHooks/setup.sh
+bash /path/to/engineering-productivity/git/hooks/setup.sh /path/to/repository
+# Explicit opt-in for all repositories:
+bash git/hooks/install-global.sh
 ```
 
-Or manually:
+The explicit repository takes precedence over the working directory. Git
+worktrees are supported. Existing `core.hooksPath` policy is preserved; integrate
+these scripts manually with existing hook managers. Conflicting hook files are
+backed up before replacement. Replaced hooks are not automatically chained.
+Global installation affects future commits and pushes in every repository that
+uses the global path, so inspect existing checks before choosing it.
 
-```bash
-# Copy hooks to your repository's .git/hooks/
-cp GitHooks/pre-commit /path/to/your/repo/.git/hooks/
-cp GitHooks/pre-push /path/to/your/repo/.git/hooks/
+## Recovery
 
-# Make them executable
-chmod +x /path/to/your/repo/.git/hooks/pre-commit
-chmod +x /path/to/your/repo/.git/hooks/pre-push
-```
+Backups are siblings named `<hook>.ep-backup-<random>`. Restore the exact backup
+after inspecting it. For a new global hooksPath, a Git config backup is saved;
+restore the previous setting to stop using the kit globally. See
+[installation and recovery](../../docs/INSTALLATION.md).
 
-### Global Installation (All Repos)
-
-To install hooks for all your Git repositories:
-
-```bash
-# Set up global git hooks directory
-git config --global core.hooksPath ~/.git-hooks
-mkdir -p ~/.git-hooks
-
-# Copy hooks
-cp GitHooks/pre-commit ~/.git-hooks/
-cp GitHooks/pre-push ~/.git-hooks/
-
-# Make executable
-chmod +x ~/.git-hooks/pre-commit
-chmod +x ~/.git-hooks/pre-push
-```
-
-## Customization
-
-Edit the hook files to:
-- Adjust regex patterns for your codebase
-- Add project-specific checks
-- Modify error messages
-- Add support for other languages
-
-## Bypassing Hooks (When Needed)
-
-```bash
-# Skip pre-commit hook
-git commit --no-verify -m "message"
-
-# Skip pre-push hook
-git push --no-verify
-```
-
-⚠️ **Use sparingly** — hooks exist to catch mistakes early.
-
-## Tips
-
-1. **Test locally first**: Hooks run automatically, so test your changes before committing
-2. **Keep hooks fast**: These hooks are designed to be quick checks, not full test suites
-3. **Customize per project**: Different projects may need different rules
-4. **Version control hooks**: Consider using [pre-commit framework](https://pre-commit.com/) for more complex setups
+For an exceptional bypass, Git supports `commit --no-verify` and `push --no-verify`.
+Follow your project's policy when using them.

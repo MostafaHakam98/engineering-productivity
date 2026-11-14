@@ -7,4 +7,8 @@
 [[ -f ~/.bash-preexec.sh ]] && source ~/.bash-preexec.sh
 
 # IMPORTANT: only init once
-command -v atuin >/dev/null 2>&1 && eval "$(atuin init bash)"
+if command -v atuin >/dev/null 2>&1 && [[ -z "${_ENGPROD_ATUIN_INIT:-}" ]]; then
+  eval "$(atuin init bash)"
+  _ENGPROD_ATUIN_INIT=1
+fi
+true

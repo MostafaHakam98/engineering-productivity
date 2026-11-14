@@ -13,7 +13,7 @@ if [[ -z "${debian_chroot:-}" && -r /etc/debian_chroot ]]; then
     debian_chroot="$(cat /etc/debian_chroot)"
 fi
 
-case "$TERM" in
+case "${TERM:-dumb}" in
     xterm-color|*-256color) color_prompt=yes ;;
 esac
 
@@ -32,7 +32,7 @@ else
 fi
 unset color_prompt force_color_prompt
 
-case "$TERM" in
+case "${TERM:-dumb}" in
     xterm*|rxvt*)
         PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\u@\h: \w\a\]$PS1"
     ;;

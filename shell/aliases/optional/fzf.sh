@@ -52,7 +52,9 @@ fkill() {
   local pid
   pid="$(ps -ef | sed 1d | fzf --height 70% --layout=reverse --prompt='kill> ' \
         --preview 'echo {}' | awk '{print $2}')" || return
-  kill -9 "$pid"
+  [[ -n "$pid" ]] || return 1
+  _engprod_confirm "Send TERM to process $pid?" || return 1
+  kill -TERM "$pid"
 }
 
 # History search
@@ -192,18 +194,18 @@ ffgrep() {
     [[ -z "$pattern" ]] && return
   fi
   
-  file="$(grep -rl "$pattern" . 2>/dev/null | \
-    fzf --height 80% --layout=reverse \
+  file="$(grep -rl -- "$pattern" . 2>/dev/null | \
+    ENGPROD_GREP_PATTERN="$pattern" fzf --height 80% --layout=reverse \
       --prompt="grep '$pattern'> " \
-      --preview "grep -n --color=always '$pattern' {} | head -50" \
+      --preview 'grep -n --color=always -- "$ENGPROD_GREP_PATTERN" {} | head -50' \
       --preview-window=right:60%:wrap)" || return
   
   if [[ -n "$file" ]]; then
     if command -v bat >/dev/null 2>&1 || command -v batcat >/dev/null 2>&1; then
       local bat_cmd="$(command -v bat 2>/dev/null || command -v batcat 2>/dev/null)"
-      grep -n --color=always "$pattern" "$file" | "$bat_cmd" --style=numbers --color=always -l bash
+      grep -n --color=always -- "$pattern" "$file" | "$bat_cmd" --style=numbers --color=always -l bash
     else
-      grep -n --color=always "$pattern" "$file" | less -R
+      grep -n --color=always -- "$pattern" "$file" | less -R
     fi
   fi
 }

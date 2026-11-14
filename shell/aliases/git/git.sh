@@ -1,3 +1,4 @@
+unalias gpf guncommit-hard gclean gbclean 2>/dev/null || true
 # Git aliases and helpers
 
 # Basic git shortcuts
@@ -19,7 +20,7 @@ alias gl='git log'
 alias gla='git log --all --graph --decorate --oneline'
 alias glp='git log --pretty=format:"%h - %an, %ar : %s"'
 alias gp='git push'
-alias gpf='git push --force-with-lease'
+gpf() { _engprod_confirm "Force-with-lease push to the remote?" && git push --force-with-lease "$@"; }
 alias gpl='git pull'
 alias gplr='git pull --rebase'
 alias gr='git rebase'
@@ -41,10 +42,10 @@ alias gblame='git blame'
 alias gcount='git rev-list --count HEAD'
 alias glast='git log -1 --stat'
 alias guncommit='git reset --soft HEAD~1'
-alias guncommit-hard='git reset --hard HEAD~1'
+guncommit-hard() { _engprod_confirm "Discard local changes and the last commit?" && git reset --hard HEAD~1; }
 alias gclean-dry='git clean -n'
-alias gclean='git clean -fd'
-alias gbclean='git branch --merged | grep -v "\*\|main\|master\|develop" | xargs -n 1 git branch -d'
+gclean() { git clean -nd && _engprod_confirm "Delete the untracked files shown above?" && git clean -fd; }
+gbclean() { git branch --merged; echo "Review and delete individual branches according to repository policy."; }
 
 # Create branch and push upstream
 gcbp() {
@@ -144,6 +145,6 @@ gbun-apply() {
 
 # Re-sync global git hooks from the engineering-productivity repo
 hooks-install-global() {
-    local repo="${ENGPROD_DIR:-$HOME/Desktop/Personal/engineering-productivity}"
+    local repo="${ENGPROD_DIR:-$HOME/engineering-productivity}"
     bash "$repo/git/hooks/install-global.sh"
 }

@@ -24,10 +24,10 @@ Renders `ai/shared/` into Claude Code's dialect and installs it:
 | `skills/<n>/` | `~/.claude/skills/<n>/` (SKILL.md, references/, scripts/) |
 | `commands/<n>.md` | `~/.claude/commands/<n>.md` |
 | `agents/<n>.md` | `~/.claude/agents/<n>.md` |
-| `permissions.json` | merged into `~/.claude/settings.json` |
+| `permissions.json` | opt-in merge into `~/.claude/settings.json` |
 
-Permissions are merged, so your model choice, theme and machine-local allow
-rules survive a re-install.
+Permissions are unchanged unless `--permissions` is explicit. An opt-in merge
+preserves model choice, theme, and existing rules, and saves a recovery backup.
 
 Set `CLAUDE_CONFIG_DIR` to install somewhere other than `~/.claude`.
 

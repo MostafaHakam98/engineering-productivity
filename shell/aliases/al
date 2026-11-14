@@ -35,7 +35,7 @@ _load_order() {
 _aliases_method() {
     local our_file="$TARGET_DIR/00-core.sh"
     local loader="$SCRIPT_DIR/loader.sh"
-    if   grep -qF "$loader"   "$BASHRC" 2>/dev/null; then echo "direct"
+    if   grep -qF 'source "$ENGPROD_DIR/shell/aliases/loader.sh"' "$BASHRC" 2>/dev/null || grep -qF "$loader" "$BASHRC" 2>/dev/null; then echo "direct"
     elif [[ -L "$our_file" ]];                        then echo "symlink"
     elif [[ -f "$our_file" ]];                        then echo "copy"
     else                                                   echo "none"
@@ -153,6 +153,7 @@ _menu_starship() {
 }
 
 cmd_menu() {
+    [[ -t 0 ]] || { echo "Menu requires a terminal; run al help." >&2; return 1; }
     while true; do
         clear
         echo -e "${B}al — shell environment manager${NC}"
@@ -216,7 +217,9 @@ cmd_status() {
     local count;  count=$(_aliases_count)
     local total;  total=$(_aliases_total)
 
-    if [[ "$method" == "none" ]]; then
+    if [[ "$method" == "direct" ]]; then
+        ok "Method: direct (sources the checkout via ~/.bashrc)"
+    elif [[ "$method" == "none" ]]; then
         fail "Not installed — run: al install"
     else
         ok "Method: $method"
@@ -301,7 +304,9 @@ cmd_doctor() {
 
     local count; count=$(_aliases_count)
     local total; total=$(_aliases_total)
-    if [[ "$count" -eq "$total" ]]; then
+    if [[ "$(_aliases_method)" == "direct" ]]; then
+        ok "Aliases source the checkout directly"
+    elif [[ "$count" -eq "$total" ]]; then
         ok "All $total alias files installed"
     elif [[ "$count" -gt 0 ]]; then
         warn "$count/$total alias files installed — run: al install"
@@ -331,6 +336,7 @@ cmd_doctor() {
     echo ""
     if [[ "$issues" -eq 0 ]]; then echo -e "  ${G}All checks passed.${NC}"; else echo -e "  ${R}$issues issue(s) found.${NC}"; fi
     echo ""
+    [[ "$issues" -eq 0 ]]
 }
 
 # ─── install ──────────────────────────────────────────────────────────────────
@@ -347,7 +353,6 @@ cmd_install() {
     _starship_install
 
     header ".bashrc"
-    _bashrc_patch
 
     echo ""
     echo -e "${G}Done.${NC} Run: ${Y}source ~/.bashrc${NC}  (or open a new terminal)"
@@ -383,13 +388,13 @@ cmd_starship() {
 _starship_install() {
     if [[ ! -f "$STARSHIP_SRC" ]]; then fail "Repo config not found at $STARSHIP_SRC"; return 1; fi
     mkdir -p "$(dirname "$STARSHIP_DST")"
-    if [[ -f "$STARSHIP_DST" ]]; then
-        if diff -q "$STARSHIP_SRC" "$STARSHIP_DST" &>/dev/null; then ok "Starship config already up to date"; return; fi
-        local bak="${STARSHIP_DST}.bak.$(date +%Y%m%d%H%M%S)"
-        cp "$STARSHIP_DST" "$bak"
-        warn "Backed up existing config → $bak"
-    fi
-    cp "$STARSHIP_SRC" "$STARSHIP_DST"
+    local stage
+    stage="$(mktemp -d "${TMPDIR:-/tmp}/ep-starship.XXXXXX")"
+    cp "$STARSHIP_SRC" "$stage/starship.toml"
+    python3 "$REPO_DIR/scripts/lib/install_files.py" "$stage" "$(dirname "$STARSHIP_DST")" --prefix .engineering-productivity-starship
+    local result=$?
+    rm -rf "$stage"
+    [ "$result" = 0 ] || return "$result"
     ok "Installed $STARSHIP_DST"
 }
 
@@ -400,34 +405,6 @@ _starship_diff() {
     echo -e "  ${D}+++ live: $STARSHIP_DST${NC}"
     echo ""
     diff --color=always "$STARSHIP_SRC" "$STARSHIP_DST" || true
-}
-
-# ─── .bashrc patching ─────────────────────────────────────────────────────────
-
-_bashrc_patch() {
-    local snippet='[[ -f ~/.bash-preexec.sh ]] && source ~/.bash-preexec.sh'
-    if grep -qF "bash-preexec" "$BASHRC" 2>/dev/null; then ok "bash-preexec already in ~/.bashrc"; return; fi
-
-    local atuin_line star_line insert_at
-    atuin_line=$(grep -n "atuin init bash"   "$BASHRC" 2>/dev/null | head -1 | cut -d: -f1 || true)
-    star_line=$(grep -n  "starship init bash" "$BASHRC" 2>/dev/null | head -1 | cut -d: -f1 || true)
-
-    local bak="${BASHRC}.bak.$(date +%Y%m%d%H%M%S)"
-    cp "$BASHRC" "$bak"
-    warn "Backed up ~/.bashrc → $bak"
-
-    if [[ -n "$atuin_line" || -n "$star_line" ]]; then
-        insert_at="${atuin_line:-$star_line}"
-        [[ -n "$atuin_line" && -n "$star_line" && "$star_line" -lt "$atuin_line" ]] && insert_at="$star_line"
-        sed -i "${insert_at}i\\
-# bash-preexec: must load before atuin and starship\\
-${snippet}\\
-" "$BASHRC"
-        ok "Injected bash-preexec before line $insert_at"
-    else
-        printf '\n# bash-preexec: must load before atuin and starship\n%s\n' "$snippet" >> "$BASHRC"
-        ok "Appended bash-preexec to ~/.bashrc"
-    fi
 }
 
 # ─── reload ───────────────────────────────────────────────────────────────────

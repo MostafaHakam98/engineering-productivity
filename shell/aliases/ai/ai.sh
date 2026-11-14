@@ -8,7 +8,7 @@
 #   export ENGPROD_DIR="$HOME/code/engineering-productivity"
 
 _engprod_dir() {
-    echo "${ENGPROD_DIR:-$HOME/Desktop/Personal/engineering-productivity}"
+    echo "${ENGPROD_DIR:-$HOME/engineering-productivity}"
 }
 
 # List the agent targets this kit can install into

@@ -44,7 +44,8 @@ ai/
 Claude Code, Codex and pi all consume `SKILL.md` directories natively, so skills
 copy across verbatim, bundled `references/` and `scripts/` included. Cursor has
 no skill loader, so each skill is converted to one agent-requestable `.mdc` rule
-and its bundled files are listed as pointers rather than silently dropped.
+and its bundled files are listed with absolute checkout paths rather than silently
+dropped. Keep the checkout in place when using these resource pointers.
 
 ## Usage
 
@@ -70,13 +71,14 @@ forge doctor                    # per-target install state and counts
 
 - **Instructions, skills, commands, agents** are written into the target's
   config directory.
-- **Permissions** are *merged* into the target's existing settings file. Your
-  model choice, theme, and machine-local allow-rules survive.
+- **Permissions** are unchanged by default. Explicit `--permissions` merges
+  Claude's allow/deny rules with a recovery backup; review that list first.
 - **Pruning is manifest-tracked**, not `rsync --delete`. Each install records
   what it wrote to `<target home>/.engineering-productivity.manifest`; the next
-  install removes only paths that this kit previously installed and no longer
-  ships. Hand-written rules and external skill symlinks living in the same
-  directory are left alone.
+  install removes only unchanged files tracked by the companion fingerprint
+  state and no longer shipped. Edited stale files and unrelated files survive;
+  conflicting installed files receive unique `.ep-backup-*` recovery backups.
+  Legacy manifests never authorize deletion. Symlink ancestors are refused.
 
 ## Adding a new agent
 
@@ -163,3 +165,12 @@ pinned ref. Bump `ref` deliberately and re-verify the paths.
 
 `claude/benchmark/` holds skill benchmarks and the `bench` runner. They measure
 Claude Code specifically and are not part of the porting layer.
+
+## Compatibility and verification
+
+See [installation and recovery](../docs/INSTALLATION.md) and
+[validation](../docs/VALIDATION.md). Rendered Codex agent files follow the
+[official standalone TOML schema](https://learn.chatgpt.com/docs/agent-configuration/subagents).
+Rendering/parsing is tested; authenticated model sessions and behavior across
+all versions of each editor/agent are not part of the offline suite. Review
+shared instructions before replacing your own global preferences.

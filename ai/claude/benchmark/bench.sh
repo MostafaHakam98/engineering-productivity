@@ -23,6 +23,7 @@ require() {
 
 require claude
 require jq
+require bc
 
 # ── args ──────────────────────────────────────────────────────────────────────
 
@@ -30,10 +31,13 @@ require jq
 
 TASK_ARG="$1"; shift
 EXTRA_SKILLS=("$@")
+for skill in "${EXTRA_SKILLS[@]}"; do
+    [[ "$skill" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]] || die "invalid skill name: $skill"
+done
 
 if [[ -f "$TASK_ARG" ]]; then
     TASK="$(cat "$TASK_ARG")"
-    TASK_ID="$(basename "$TASK_ARG" .txt)"
+    TASK_ID="$(basename "$TASK_ARG" .txt | tr -c 'a-zA-Z0-9_-' '_')"
 else
     TASK="$TASK_ARG"
     TASK_ID="task_$(date +%s)"
@@ -86,8 +90,9 @@ echo ""
 echo "Task: $TASK_ID"
 echo "────────────────────────────────────────────────────────────────────────"
 
+FAILED=0
 for v in "${VARIANTS[@]}"; do
-    run_variant "$v" || true
+    run_variant "$v" || FAILED=1
 done
 
 # ── table ─────────────────────────────────────────────────────────────────────
@@ -135,3 +140,5 @@ done
 
 echo ""
 echo "Results saved to: $RESULTS_DIR/"
+
+exit "$FAILED"

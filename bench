@@ -3,4 +3,4 @@
 # Usage: ./bench "task prompt" [skill ...]
 #        ./bench ai/claude/benchmark/tasks/T1.txt [skill ...]
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec "$SCRIPT_DIR/ai/claude/benchmark/bench.sh" "$@"
+exec bash "$SCRIPT_DIR/ai/claude/benchmark/bench.sh" "$@"

@@ -11,7 +11,7 @@ Claude Code is one target of the shared AI kit: the content lives in
 
 1. [Claude Code CLI](https://claude.ai/code) installed (`claude` available in PATH)
 2. Shell aliases installed: `./forge install shell` (or `cd shell/aliases && ./setup.sh`)
-3. `ENGPROD_DIR` optionally set in `~/.bashrc` (defaults to `~/Desktop/Personal/engineering-productivity`)
+3. `ENGPROD_DIR` optionally set in `~/.bashrc` (defaults to `~/engineering-productivity`)
 
 ---
 
@@ -146,7 +146,7 @@ claude-install-global    # re-syncs ~/.claude/ with latest global/
 
 ### Overriding the repo path
 
-If this repository lives somewhere other than `~/Desktop/Personal/engineering-productivity`:
+If this repository lives somewhere other than `~/engineering-productivity`:
 
 ```bash
 # Add to ~/.bashrc before sourcing aliases
@@ -184,8 +184,8 @@ source ~/.bashrc
 Check that `ENGPROD_DIR` points to the correct location:
 
 ```bash
-echo "${ENGPROD_DIR:-$HOME/Desktop/Personal/engineering-productivity}"
-ls "${ENGPROD_DIR:-$HOME/Desktop/Personal/engineering-productivity}/ai/scripts/"
+echo "${ENGPROD_DIR:-$HOME/engineering-productivity}"
+ls "${ENGPROD_DIR:-$HOME/engineering-productivity}/ai/scripts/"
 ```
 
 **`claude-install-project` refuses to run**

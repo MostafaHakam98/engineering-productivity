@@ -84,7 +84,7 @@ No other files need changing.
 |------------|-----------------------------------------------|
 | `c`, `cls` | Clear screen                                  |
 | `mkdirp`   | `mkdir -p`                                    |
-| `rmf`      | `rm -rf`                                      |
+| `rmf`      | Confirmed permanent removal                                      |
 | `bat`      | `batcat` alias (Debian/Ubuntu only — guarded) |
 | `nalert`   | Desktop notification for last command         |
 
@@ -94,11 +94,11 @@ No other files need changing.
 |--------------------------|----------------------------------------------|
 | `claude-install-global`  | Install global Claude config to `~/.claude/` |
 | `claude-install-project` | Install project template into `./.claude/`   |
-| `claude-sync-project`    | Sync template updates (non-destructive)      |
+| `claude-sync-project`    | Force-sync template with recovery backups      |
 | `cdclaudeconfig`         | `cd ~/.claude/`                              |
 | `claude-help`            | Print Claude Code commands reference         |
 
-Set `ENGPROD_DIR` in `~/.bashrc` if the repo is not at its default location.
+Installation sets `ENGPROD_DIR` to the actual checkout path. Keep the checkout in place.
 
 ### Git
 
@@ -113,7 +113,7 @@ Set `ENGPROD_DIR` in `~/.bashrc` if the repo is not at its default location.
 | `gd` / `gds`         | diff / diff --staged              |
 | `gl` / `gla`         | log / log --all --graph --oneline |
 | `gst` / `gstp`       | stash / stash pop                 |
-| `gpf`                | push --force-with-lease           |
+| `gpf`                | confirmed force-with-lease push   |
 | `gri`                | rebase -i                         |
 | `guncommit`          | reset --soft HEAD~1               |
 
@@ -173,3 +173,14 @@ avoid the collision.
 source ~/.bashrc          # copy or symlink mode
 source loader.sh          # direct mode
 ```
+
+## Safety and recovery
+
+Installers back up replaced files and refuse symlink ancestors. See
+[installation and recovery](../../docs/INSTALLATION.md). Destructive convenience
+helpers (`rmf`, `gpf`, `guncommit-hard`, `gclean`, Docker bulk removal/cleanup,
+and `fkill`) require an interactive confirmation and decline in scripts.
+`gbclean` lists merged branches for manual review instead of deleting them.
+Commands still perform the requested destructive action after confirmation;
+review arguments and your repository policy. This kit does not replace core
+commands such as `rm` or `git`.

@@ -1,10 +1,15 @@
+unalias rmf 2>/dev/null || true
 #!/bin/bash
 # General tool aliases
 
 alias c='clear'
 alias cls='clear'
 alias mkdirp='mkdir -p'
-alias rmf='rm -rf'
+rmf() {
+  [[ $# -gt 0 ]] || { echo "Usage: rmf <path...>" >&2; return 1; }
+  _engprod_confirm "Permanently delete the specified paths: $*?" || return 1
+  rm -rf -- "$@"
+}
 
 # Tool shortcuts
 command -v batcat >/dev/null 2>&1 && alias bat='batcat'  # Debian/Ubuntu; elsewhere bat is already bat

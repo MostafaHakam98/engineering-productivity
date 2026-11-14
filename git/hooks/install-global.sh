@@ -1,23 +1,31 @@
 #!/usr/bin/env bash
+# Explicit global opt-in; preserve existing hook files and hooksPath policy.
 set -euo pipefail
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET="$HOME/.git-hooks"
-
-G='\033[0;32m'; D='\033[2m'; NC='\033[0m'
-ok()   { echo -e "  ${G}✓${NC}  $*"; }
-info() { echo -e "  ${D}·${NC}  $*"; }
-
-mkdir -p "$TARGET"
-git config --global core.hooksPath "$TARGET"
-
+command -v python3 >/dev/null || { echo "python3 is required" >&2; exit 1; }
+previous="$(git config --global core.hooksPath || true)"
+if [ -n "$previous" ] && [ "$previous" != "$TARGET" ]; then
+    echo "Existing global core.hooksPath: $previous; refusing to replace it." >&2
+    exit 1
+fi
+stage="$(mktemp -d "${TMPDIR:-/tmp}/ep-hooks.XXXXXX")"
+trap 'rm -rf "$stage"' EXIT
 for hook in pre-commit pre-push; do
-    if [[ -f "$SCRIPT_DIR/$hook" ]]; then
-        cp "$SCRIPT_DIR/$hook" "$TARGET/$hook"
-        chmod +x "$TARGET/$hook"
-        ok "Installed $hook → $TARGET/$hook"
-    fi
+    cp "$SCRIPT_DIR/$hook" "$stage/$hook"
+    chmod +x "$stage/$hook"
 done
-
-ok "Global hooks configured: core.hooksPath = $TARGET"
-info "Hooks will run automatically on every commit and push"
+python3 "$SCRIPT_DIR/../../scripts/lib/install_files.py" "$stage" "$TARGET" --prefix .engineering-productivity-hooks
+# Preserve the config before changing it; config may itself be a dotfile link.
+if [ -z "$previous" ]; then
+    python3 - "$HOME/.gitconfig" <<'PY'
+import pathlib, shutil, sys, tempfile
+p = pathlib.Path(sys.argv[1])
+if p.is_file():
+    with tempfile.NamedTemporaryFile(prefix=p.name + '.ep-backup-', dir=p.parent, delete=False) as f:
+        shutil.copyfileobj(p.open('rb'), f)
+        print('Global Git config backup:', f.name)
+PY
+    git config --global core.hooksPath "$TARGET"
+fi
+echo "Global hooks configured: $TARGET"

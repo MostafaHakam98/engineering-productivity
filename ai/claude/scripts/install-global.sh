@@ -3,4 +3,4 @@
 # Canonical entry point: ai/scripts/install-global.sh claude
 set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-exec "$SCRIPT_DIR/../../scripts/install-global.sh" claude "$@"
+exec bash "$SCRIPT_DIR/../../scripts/install-global.sh" claude "$@"

@@ -1,24 +1,28 @@
 #!/usr/bin/env bash
+# Read-only syntax check. Never execute project code or write bytecode/databases.
 set -euo pipefail
-
-echo "[pre-push] quick checks..."
-
-# If Python exists in repo: block syntax errors fast
-if ls *.py >/dev/null 2>&1 || [ -d "src" ] || [ -f "manage.py" ]; then
-  echo "→ Python compile sanity..."
-  python -m compileall -q . || {
-    echo "❌ Push blocked: python compile failed."
-    exit 1
-  }
+if [ -z "$(git ls-files '*.py')" ]; then
+    echo "[pre-push] no tracked Python files; skipped."
+    exit 0
 fi
-
-# If Django project: run a tiny test subset (optional)
-if [ -f "manage.py" ]; then
-  echo "→ Django smoke test..."
-  python manage.py test --keepdb -q || {
-    echo "❌ Push blocked: tests failed."
-    exit 1
-  }
-fi
-
-echo "✅ pre-push passed."
+command -v python3 >/dev/null || {
+    echo "[pre-push] python3 unavailable; syntax check skipped." >&2; exit 0;
+}
+git ls-files -z '*.py' | python3 -c '
+import ast, pathlib, sys
+failed = False
+for name in sys.stdin.buffer.read().split(b"\0"):
+    if not name:
+        continue
+    path = pathlib.Path(name.decode("utf-8", "surrogateescape"))
+    if not path.is_file() or path.is_symlink():
+        continue
+    try:
+        # compile() honors Python encoding cookies without executing the code.
+        compile(path.read_bytes(), str(path), "exec", ast.PyCF_ONLY_AST)
+    except (SyntaxError, ValueError) as error:
+        print(f"{path}: {error}", file=sys.stderr)
+        failed = True
+sys.exit(int(failed))
+'
+echo "[pre-push] Python syntax passed."

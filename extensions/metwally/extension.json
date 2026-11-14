@@ -7,8 +7,8 @@
   "source": {
     "type": "git",
     "url": "https://github.com/MostafaHakam98/metwally-vscode.git",
-    "ref": "default",
-    "note": "Tracks the repository default branch; set a branch, tag or commit here to pin."
+    "ref": "fdc9f223a16a3793a0ea72f1e466b40cd0772725",
+    "note": "Pinned revision for reproducible builds; update deliberately after sandbox validation."
   },
   "build": {
     "requires": [
@@ -16,10 +16,10 @@
       "npm"
     ],
     "steps": [
-      "npm ci --no-audit --no-fund || npm install --no-audit --no-fund",
+      "npm ci --no-audit --no-fund",
       "npm run compile",
       "npm test",
-      "npx --yes @vscode/vsce package --allow-missing-repository --out metwally.vsix"
+      "npx --yes @vscode/vsce@3.7.1 package --allow-missing-repository --out metwally.vsix"
     ],
     "artifact": "metwally.vsix"
   },

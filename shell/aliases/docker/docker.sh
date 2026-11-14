@@ -1,3 +1,4 @@
+unalias drmia 2>/dev/null || true
 #!/bin/bash
 # Docker aliases and helpers
 
@@ -41,7 +42,12 @@ alias dvol='docker volume'
 alias dvols='docker volume ls'
 alias dnet='docker network'
 alias dnets='docker network ls'
-alias drmia='docker rmi $(docker images -q)'
+drmia() {
+  _engprod_confirm "Remove all local Docker images?" || return 1
+  local -a ids=()
+  mapfile -t ids < <(docker images -q)
+  ((${#ids[@]})) && docker rmi "${ids[@]}"
+}
 
 # Container operations
 dbash() {
@@ -84,20 +90,29 @@ drmf() {
 }
 
 dstopall() {
-  docker stop $(docker ps -q)
+  _engprod_confirm "Docker stop on ALL containers?" || return 1
+  local -a ids=()
+  mapfile -t ids < <(docker ps -q)
+  ((${#ids[@]})) && docker stop "${ids[@]}"
 }
 
 drmall() {
-  docker rm $(docker ps -aq)
+  _engprod_confirm "Docker rm on ALL containers?" || return 1
+  local -a ids=()
+  mapfile -t ids < <(docker ps -aq)
+  ((${#ids[@]})) && docker rm "${ids[@]}"
 }
 
 drmfall() {
-  docker rm -f $(docker ps -aq)
+  _engprod_confirm "Docker rm -f on ALL containers?" || return 1
+  local -a ids=()
+  mapfile -t ids < <(docker ps -aq)
+  ((${#ids[@]})) && docker rm -f "${ids[@]}"
 }
 
 dclean() {
-  echo "Cleaning up Docker resources..."
-  docker system prune -a --volumes -f
+  _engprod_confirm "Remove unused Docker images, containers, networks, and volumes?" || return 1
+  docker system prune -a --volumes
 }
 
 dstats() {
@@ -202,7 +217,8 @@ dvolinspect() {
 }
 
 dvolprune() {
-  docker volume prune -f
+  _engprod_confirm "Remove unused Docker volumes and their data?" || return 1
+  docker volume prune
 }
 
 dip() {

@@ -29,6 +29,7 @@ usage() {
 case "$1" in -h|--help) usage; exit 0 ;; esac
 
 TARGET="$1"; shift
+[[ "$TARGET" =~ ^[a-z][a-z0-9-]*$ ]] || { echo "invalid target: $TARGET" >&2; exit 1; }
 TARGET_FILE="$TARGETS_DIR/$TARGET.target"
 [ -f "$TARGET_FILE" ] || { echo "unknown target: $TARGET" >&2; echo >&2; usage >&2; exit 1; }
 
@@ -51,10 +52,27 @@ PROJECT_DEST="";      PROJECT_FORMAT=""
 . "$TARGET_FILE"
 
 OUT="${OUT:-$(mktemp -d "${TMPDIR:-/tmp}/ai-port-$TARGET.XXXXXX")}"
+# A render must never replace an existing tree (including symlinked files).
+if [ -e "$OUT" ] || [ -L "$OUT" ]; then
+    [ -d "$OUT" ] && [ ! -L "$OUT" ] && [ -z "$(ls -A "$OUT")" ] || {
+        echo "--out must be a new or empty directory: $OUT" >&2; exit 1;
+    }
+fi
+python3 - "$AI_DIR/../scripts/lib" "$OUT" "$TARGET_HOME" <<'PYTHON'
+import pathlib, sys
+sys.path.insert(0, sys.argv[1])
+from install_files import checked
+checked(sys.argv[2], leaf=True)
+home = pathlib.Path(sys.argv[3])
+if not home.is_absolute() or home == pathlib.Path('/'):
+    raise SystemExit('target home must be an absolute non-root directory')
+PYTHON
 mkdir -p "$OUT"
 
 # Placeholder values for this target, consumed by subst() in lib/render.sh.
 export PH_SKILLS_DIR="$SKILLS_DEST"
+# Cursor rules are flat; bundled resources remain in this reviewed checkout.
+[ "$SKILLS_FORMAT" != "mdc" ] || PH_SKILLS_DIR="$SHARED_DIR/skills"
 export PH_CONFIG_DIR="$PROJECT_DEST"
 export PH_RULE_EXT="md"
 export PH_ENTRYPOINT="CLAUDE.md"
